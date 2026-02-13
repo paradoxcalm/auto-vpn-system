@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto VPN — Servers</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0f;
+            --card: #12121a;
+            --card-hover: #1a1a28;
+            --border: #2a2a3a;
+            --text: #e0e0e8;
+            --text-dim: #8888aa;
+            --accent: #6c5ce7;
+            --accent2: #00cec9;
+            --green: #00b894;
+            --red: #e74c3c;
+            --orange: #f39c12;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px 20px;
+            background: linear-gradient(135deg, #0a0a1a 0%, #151530 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header h1 span {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 16px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--accent2);
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .country-section {
+            margin-bottom: 30px;
+        }
+
+        .country-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .country-flag {
+            font-size: 1.8em;
+        }
+
+        .country-name {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .country-count {
+            color: var(--text-dim);
+            font-size: 0.9em;
+        }
+
+        .nodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 16px;
+        }
+
+        .node-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+
+        .node-card:hover {
+            background: var(--card-hover);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .node-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .node-name {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .node-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8em;
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+
+        .node-status.online {
+            background: rgba(0, 184, 148, 0.15);
+            color: var(--green);
+        }
+
+        .node-status.offline {
+            background: rgba(231, 76, 60, 0.15);
+            color: var(--red);
+        }
+
+        .node-status .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .node-info {
+            color: var(--text-dim);
+            font-size: 0.85em;
+            margin-bottom: 14px;
+        }
+
+        .protocols {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+
+        .protocol-tag {
+            font-size: 0.75em;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .protocol-tag.vless {
+            background: rgba(108, 92, 231, 0.2);
+            color: var(--accent);
+        }
+
+        .protocol-tag.hysteria {
+            background: rgba(0, 206, 201, 0.2);
+            color: var(--accent2);
+        }
+
+        .key-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-copy {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-copy:hover {
+            background: #5a4bd4;
+        }
+
+        .btn-qr {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-qr:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .btn-hy2 {
+            background: rgba(0, 206, 201, 0.15);
+            color: var(--accent2);
+            border: 1px solid rgba(0, 206, 201, 0.3);
+        }
+
+        .btn-hy2:hover {
+            background: rgba(0, 206, 201, 0.25);
+        }
+
+        .copied {
+            background: var(--green) !important;
+        }
+
+        /* QR Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .modal h3 {
+            margin-bottom: 16px;
+        }
+
+        .modal canvas {
+            border-radius: 8px;
+            max-width: 100%;
+        }
+
+        .modal .close-btn {
+            margin-top: 16px;
+            padding: 10px 30px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-dim);
+        }
+
+        .empty-state h2 {
+            margin-bottom: 12px;
+            color: var(--text);
+        }
+
+        .empty-state code {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+            word-break: break-all;
+        }
+
+        @media (max-width: 600px) {
+            .nodes-grid {
+                grid-template-columns: 1fr;
+            }
+            .stats { gap: 20px; }
+            .header h1 { font-size: 1.5em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1><span>Auto VPN</span> Servers</h1>
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-value">{{ total }}</div>
+            <div class="stat-label">Servers</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">{{ countries | length }}</div>
+            <div class="stat-label">Countries</div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    {% if nodes %}
+        {% for cc, country in countries.items() | sort %}
+        <div class="country-section">
+            <div class="country-header">
+                <span class="country-flag">{{ country.flag }}</span>
+                <span class="country-name">{{ country.name }}</span>
+                <span class="country-count">{{ country.nodes | length }} server{{ 's' if country.nodes | length > 1 else '' }}</span>
+            </div>
+            <div class="nodes-grid">
+                {% for node in country.nodes %}
+                <div class="node-card">
+                    <div class="node-top">
+                        <span class="node-name">{{ node.node_name }}</span>
+                        <span class="node-status {{ node.get('status', 'online') }}">
+                            <span class="dot"></span>
+                            {{ node.get('status', 'online') }}
+                        </span>
+                    </div>
+                    <div class="node-info">
+                        {{ node.get('city', '') }}{% if node.get('isp') %} &middot; {{ node.isp }}{% endif %}
+                    </div>
+                    <div class="protocols">
+                        {% for proto in node.get('protocols', ['vless-reality']) %}
+                        <span class="protocol-tag {{ 'hysteria' if 'hysteria' in proto else 'vless' }}">{{ proto }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="key-actions">
+                        <button class="btn btn-copy" onclick="copyKey(this, '{{ node.vless_link }}')">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                            VLESS
+                        </button>
+                        {% if node.get('hysteria_link') %}
+                        <button class="btn btn-hy2" onclick="copyKey(this, '{{ node.hysteria_link }}')">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                            HY2
+                        </button>
+                        {% endif %}
+                        <button class="btn btn-qr" onclick="showQR('{{ node.node_name }}', '{{ node.vless_link }}')">
+                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M3 11V3h8v8H3zm2-6v4h4V5H5zm8-2v8h8V3h-8zm6 6h-4V5h4v4zM3 21v-8h8v8H3zm2-6v4h4v-4H5zm8 0h2v2h-2v-2zm0 4h2v2h-2v-2zm4-4h2v2h-2v-2zm0 4h2v2h-2v-2z"/></svg>
+                            QR
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <h2>No servers yet</h2>
+            <p>Run the install script on your servers to add them here:</p>
+            <code>bash install.sh --api-url https://your-panel.com --api-key YOUR_KEY</code>
+        </div>
+    {% endif %}
+</div>
+
+<!-- QR Modal -->
+<div class="modal-overlay" id="qrModal" onclick="closeQR(event)">
+    <div class="modal">
+        <h3 id="qrTitle"></h3>
+        <canvas id="qrCanvas"></canvas>
+        <br>
+        <button class="close-btn" onclick="document.getElementById('qrModal').classList.remove('active')">Close</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+function copyKey(btn, link) {
+    navigator.clipboard.writeText(link).then(() => {
+        const orig = btn.innerHTML;
+        btn.classList.add('copied');
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+            btn.innerHTML = orig;
+            btn.classList.remove('copied');
+        }, 1500);
+    });
+}
+
+function showQR(name, link) {
+    document.getElementById('qrTitle').textContent = name;
+    const canvas = document.getElementById('qrCanvas');
+    QRCode.toCanvas(canvas, link, {
+        width: 280,
+        margin: 2,
+        color: { dark: '#e0e0e8', light: '#12121a' }
+    });
+    document.getElementById('qrModal').classList.add('active');
+}
+
+function closeQR(e) {
+    if (e.target === e.currentTarget) {
+        e.target.classList.remove('active');
+    }
+}
+</script>
+
+</body>
+</html>
