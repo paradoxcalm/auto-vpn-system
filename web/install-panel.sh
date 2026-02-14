@@ -71,6 +71,7 @@ else
     curl -sf "$REPO_URL/app.py" -o "$PANEL_DIR/app.py"
     curl -sf "$REPO_URL/templates/index.html" -o "$PANEL_DIR/templates/index.html"
     curl -sf "$REPO_URL/templates/login.html" -o "$PANEL_DIR/templates/login.html"
+    curl -sf "$REPO_URL/templates/client.html" -o "$PANEL_DIR/templates/client.html"
 fi
 
 # Generate API key

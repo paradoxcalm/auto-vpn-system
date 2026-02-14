@@ -180,6 +180,30 @@ def index():
                            total=len(nodes))
 
 
+# ======================== PUBLIC CLIENT PAGE ========================
+
+@app.route("/go")
+def client_page():
+    """Public client page — no login required.
+    Shows two buttons: iOS / Android.
+    Auto-picks best server, copies config, redirects to app store.
+    No suspicious words anywhere on the page.
+    """
+    nodes = load_nodes()
+    # Only expose minimal safe data to client page
+    safe_nodes = []
+    for n in nodes:
+        if n.get("status") == "online" or not n.get("status"):
+            safe_nodes.append({
+                "cc": n.get("country_code", "XX"),
+                "vless_link": n.get("vless_link", ""),
+                "hysteria_link": n.get("hysteria_link", ""),
+                "status": n.get("status", "online"),
+            })
+    return render_template("client.html",
+                           nodes_json=json.dumps(safe_nodes, ensure_ascii=False))
+
+
 # ======================== MAIN ========================
 
 if __name__ == "__main__":

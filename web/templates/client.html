@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>NovaPulse</title>
+    <meta name="description" content="Cloud connectivity platform">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #050508;
+            --surface: #0d0d14;
+            --border: #1a1a2e;
+            --text: #f0f0f5;
+            --dim: #6b6b8a;
+            --accent: #7c6cf0;
+            --glow: rgba(124, 108, 240, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Animated background */
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 20s ease-in-out infinite;
+            pointer-events: none;
+        }
+        .bg-orb:nth-child(1) {
+            width: 400px; height: 400px;
+            background: #7c6cf0;
+            top: -100px; left: -100px;
+        }
+        .bg-orb:nth-child(2) {
+            width: 300px; height: 300px;
+            background: #00cec9;
+            bottom: -80px; right: -80px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(30px, 20px); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 40px 24px;
+            max-width: 420px;
+            width: 100%;
+        }
+
+        .logo {
+            font-size: 3.5em;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .brand {
+            font-size: 1.8em;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 6px;
+            background: linear-gradient(135deg, #f0f0f5 0%, #a8a8c8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tagline {
+            color: var(--dim);
+            font-size: 0.9em;
+            font-weight: 300;
+            margin-bottom: 48px;
+            letter-spacing: 0.5px;
+        }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 18px 32px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 1.05em;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        .btn:hover {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, var(--surface) 0%, rgba(124, 108, 240, 0.08) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px var(--glow);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn svg {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .btn-apple svg { fill: var(--text); }
+        .btn-android svg { fill: #3ddc84; }
+
+        /* Success state */
+        .btn.copied {
+            border-color: #00b894;
+            background: rgba(0, 184, 148, 0.1);
+        }
+
+        .btn.copied .btn-text::after {
+            content: ' — Copied!';
+            color: #00b894;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 24px;
+            font-size: 0.85em;
+            color: var(--dim);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+            white-space: nowrap;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            padding: 16px;
+            color: var(--dim);
+            font-size: 0.7em;
+            opacity: 0.5;
+        }
+
+        /* Hide on desktop — show instruction */
+        @media (min-width: 768px) {
+            .tagline { margin-bottom: 32px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-orb"></div>
+<div class="bg-orb"></div>
+
+<div class="container">
+    <div class="logo">⚡</div>
+    <div class="brand">NovaPulse</div>
+    <p class="tagline">Fast. Private. Everywhere.</p>
+
+    <div class="buttons">
+        <button class="btn btn-apple" onclick="connect('ios')">
+            <svg viewBox="0 0 24 24"><path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 16.97 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/></svg>
+            <span class="btn-text">iPhone / iPad</span>
+        </button>
+
+        <button class="btn btn-android" onclick="connect('android')">
+            <svg viewBox="0 0 24 24"><path d="M17.6 11.48V11.47C17.6 8.86 15.33 6.7 12 6.7C8.67 6.7 6.4 8.86 6.4 11.47V11.48C4.97 11.65 3.85 12.87 3.85 14.36C3.85 15.95 5.12 17.22 6.71 17.22H17.29C18.88 17.22 20.15 15.95 20.15 14.36C20.15 12.87 19.03 11.65 17.6 11.48ZM7.22 3.21L6.09 2.08C8.95.72 11.97.5 15 1.78L13.91 2.87C12.35 2.32 10.56 2.24 7.22 3.21ZM16.78 3.21C13.44 2.24 11.65 2.32 10.09 2.87L9 1.78C12.03.5 15.05.72 17.91 2.08L16.78 3.21Z" fill="#3ddc84"/><path d="M6.4 11.47C6.4 8.86 8.67 6.7 12 6.7C15.33 6.7 17.6 8.86 17.6 11.47" fill="none"/></svg>
+            <span class="btn-text">Android</span>
+        </button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="footer">NovaPulse Cloud Services</div>
+
+<script>
+// Server configs injected by Flask
+const NODES = {{ nodes_json | safe }};
+
+function getBestNode() {
+    if (!NODES || NODES.length === 0) return null;
+    // Just pick first available online node (or random)
+    const online = NODES.filter(n => n.status === 'online');
+    if (online.length === 0) return NODES[0];
+    return online[Math.floor(Math.random() * online.length)];
+}
+
+function showToast(msg, duration = 3000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function connect(platform) {
+    const node = getBestNode();
+    if (!node) {
+        showToast('Service temporarily unavailable');
+        return;
+    }
+
+    const link = node.vless_link;
+    const btn = event.currentTarget;
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(link).then(() => {
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 2000);
+
+        if (platform === 'ios') {
+            showToast('Config copied! Opening App Store...');
+            // Try to open Streisand or V2Box directly, fallback to App Store
+            setTimeout(() => {
+                window.location.href = 'https://apps.apple.com/app/streisand/id6450534064';
+            }, 800);
+        } else {
+            showToast('Config copied! Opening Play Store...');
+            setTimeout(() => {
+                window.location.href = 'https://play.google.com/store/apps/details?id=com.v2ray.ang';
+            }, 800);
+        }
+    }).catch(() => {
+        // Fallback: select text in prompt
+        prompt('Copy this config:', link);
+    });
+}
+</script>
+
+</body>
+</html>
