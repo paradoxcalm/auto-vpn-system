@@ -226,9 +226,11 @@ rm -rf /tmp/xray /tmp/xray.zip
 log_ok "Xray-core v${XRAY_VERSION} installed"
 
 # Generate x25519 keypair
+# Xray v24: "Private key: xxx" / "Public key: xxx"
+# Xray v26: "PrivateKey: xxx" / "Password: xxx" / "Hash32: xxx"
 KEYS=$(/usr/local/bin/xray x25519)
-PRIVATE_KEY=$(echo "$KEYS" | grep "Private" | awk '{print $3}')
-PUBLIC_KEY=$(echo "$KEYS" | grep "Public" | awk '{print $3}')
+PRIVATE_KEY=$(echo "$KEYS" | grep -i "private" | awk '{print $NF}')
+PUBLIC_KEY=$(echo "$KEYS" | grep -iE "public|password" | head -1 | awk '{print $NF}')
 
 # Generate UUID
 UUID=$(/usr/local/bin/xray uuid)
