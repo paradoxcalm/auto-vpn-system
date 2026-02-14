@@ -357,6 +357,8 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
 XRAYCONF
 
 mkdir -p /var/log/xray
+chown -R nobody:nogroup /var/log/xray
+chmod 755 /var/log/xray
 
 log_ok "Xray config created"
 
