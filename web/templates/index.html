@@ -402,13 +402,13 @@
 <div class="modal-overlay" id="qrModal" onclick="closeQR(event)">
     <div class="modal">
         <h3 id="qrTitle"></h3>
-        <canvas id="qrCanvas"></canvas>
+        <div id="qrCanvas"></div>
         <br>
         <button class="close-btn" onclick="document.getElementById('qrModal').classList.remove('active')">Close</button>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
 function copyKey(btn, link) {
     navigator.clipboard.writeText(link).then(() => {
@@ -424,11 +424,15 @@ function copyKey(btn, link) {
 
 function showQR(name, link) {
     document.getElementById('qrTitle').textContent = name;
-    const canvas = document.getElementById('qrCanvas');
-    QRCode.toCanvas(canvas, link, {
+    const container = document.getElementById('qrCanvas');
+    container.innerHTML = '';
+    new QRCode(container, {
+        text: link,
         width: 280,
-        margin: 2,
-        color: { dark: '#e0e0e8', light: '#12121a' }
+        height: 280,
+        colorDark: '#e0e0e8',
+        colorLight: '#12121a',
+        correctLevel: QRCode.CorrectLevel.M
     });
     document.getElementById('qrModal').classList.add('active');
 }
