@@ -67,9 +67,10 @@ if [[ -f "$SCRIPT_DIR/app.py" ]]; then
     cp -r "$SCRIPT_DIR/static/"* "$PANEL_DIR/static/" 2>/dev/null || true
 else
     log_info "Downloading panel files from GitHub..."
-    REPO_URL="https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main/web"
+    REPO_URL="https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main/web"
     curl -sf "$REPO_URL/app.py" -o "$PANEL_DIR/app.py"
     curl -sf "$REPO_URL/templates/index.html" -o "$PANEL_DIR/templates/index.html"
+    curl -sf "$REPO_URL/templates/login.html" -o "$PANEL_DIR/templates/login.html"
 fi
 
 # Generate API key
@@ -206,11 +207,11 @@ echo ""
 echo -e "  ${BOLD}To add VPN nodes, run on each server:${NC}"
 echo ""
 if [[ -n "$PANEL_DOMAIN" ]]; then
-    echo -e "  ${CYAN}curl -sSL https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main/install.sh | bash -s -- \\${NC}"
+    echo -e "  ${CYAN}curl -sSL https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main/install.sh | bash -s -- \\${NC}"
     echo -e "  ${CYAN}  --api-url https://$PANEL_DOMAIN \\${NC}"
     echo -e "  ${CYAN}  --api-key $API_KEY${NC}"
 else
-    echo -e "  ${CYAN}curl -sSL https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main/install.sh | bash -s -- \\${NC}"
+    echo -e "  ${CYAN}curl -sSL https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main/install.sh | bash -s -- \\${NC}"
     echo -e "  ${CYAN}  --api-url http://$PANEL_IP \\${NC}"
     echo -e "  ${CYAN}  --api-key $API_KEY${NC}"
 fi

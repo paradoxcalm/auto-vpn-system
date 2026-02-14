@@ -3,7 +3,16 @@
     "allow": [
       "WebFetch(domain:github.com)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh auth login:*)",
+      "Bash(curl:*)",
+      "Bash(nslookup:*)",
+      "Bash(git remote add:*)",
+      "Bash(ssh-keygen:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: Auto VPN System\n\n- install.sh: one-command VPN node setup with auto geo-detection\n- VLESS + REALITY + Vision \\(Xray-core\\)\n- Optional Hysteria2 \\(UDP/QUIC\\) and Cloudflare WARP\n- TCP BBR, UFW, fail2ban hardening\n- Central web panel \\(Flask\\) for collecting keys from all nodes\n- Auto country/city detection, node naming, QR code generation\n- User management \\(add-user.sh\\)\n- Node heartbeat monitoring\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git branch:*)",
+      "Bash(git push:*)"
     ]
   }
 }

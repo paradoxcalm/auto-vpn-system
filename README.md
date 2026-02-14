@@ -28,7 +28,7 @@
 
 ```bash
 # Скачай и запусти
-curl -sSL https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main/web/install-panel.sh | bash -s -- --domain panel.example.com
+curl -sSL https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main/web/install-panel.sh | bash -s -- --domain panel.example.com
 ```
 
 После установки ты получишь **API_KEY** — запомни его.
@@ -37,12 +37,12 @@ curl -sSL https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main/web/i
 
 ```bash
 # Базовая установка: VLESS + REALITY
-curl -sSL https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main/install.sh | bash -s -- \
+curl -sSL https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main/install.sh | bash -s -- \
   --api-url https://panel.example.com \
   --api-key YOUR_API_KEY
 
 # Полная установка: VLESS + REALITY + Hysteria2 + WARP
-curl -sSL https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main/install.sh | bash -s -- \
+curl -sSL https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main/install.sh | bash -s -- \
   --api-url https://panel.example.com \
   --api-key YOUR_API_KEY \
   --hysteria \

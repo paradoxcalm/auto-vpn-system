@@ -12,16 +12,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from functools import wraps
 
-from flask import Flask, request, jsonify, render_template, abort
+from flask import Flask, request, jsonify, render_template, abort, session, redirect, url_for
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_urlsafe(32))
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/opt/auto-vpn-panel/data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 NODES_FILE = DATA_DIR / "nodes.json"
 
-# API key for node authentication
+# API key for node authentication AND web panel access
 API_KEY = os.environ.get("API_KEY", secrets.token_urlsafe(32))
+
+# Web panel password (same as API_KEY by default, or set PANEL_PASSWORD)
+PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", API_KEY)
 
 
 def load_nodes():
@@ -93,24 +97,11 @@ def register_node():
 
 
 @app.route("/api/nodes", methods=["GET"])
+@require_api_key
 def list_nodes():
-    """Public endpoint to list all nodes (without sensitive data)."""
+    """List all nodes (requires API key — contains sensitive links)."""
     nodes = load_nodes()
-    public_nodes = []
-    for n in nodes:
-        public_nodes.append({
-            "id": n.get("id"),
-            "node_name": n.get("node_name"),
-            "country_code": n.get("country_code"),
-            "country_name": n.get("country_name"),
-            "city": n.get("city"),
-            "protocols": n.get("protocols", ["vless-reality"]),
-            "status": n.get("status", "unknown"),
-            "vless_link": n.get("vless_link"),
-            "hysteria_link": n.get("hysteria_link"),
-            "last_seen": n.get("last_seen"),
-        })
-    return jsonify(public_nodes)
+    return jsonify(nodes)
 
 
 @app.route("/api/nodes/<node_id>", methods=["DELETE"])
@@ -136,9 +127,38 @@ def heartbeat(node_id):
     return jsonify({"status": "ok"})
 
 
+# ======================== WEB AUTH ========================
+
+def require_login(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("authenticated"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        if request.form.get("password") == PANEL_PASSWORD:
+            session["authenticated"] = True
+            return redirect(url_for("index"))
+        error = "Wrong password"
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 # ======================== WEB ROUTES ========================
 
 @app.route("/")
+@require_login
 def index():
     nodes = load_nodes()
     # Group by country

@@ -3,7 +3,7 @@
 # AUTO-VPN SYSTEM — Main Installer
 # Автоматическая установка VPN-ноды с определением гео и отправкой ключа
 #
-# Usage: curl -sSL https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main/install.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main/install.sh | bash
 #    or: bash install.sh [OPTIONS]
 #
 # Options:
@@ -49,7 +49,7 @@ NO_REPORT=false
 INSTALL_DIR="/opt/auto-vpn"
 CONFIG_DIR="/etc/xray"
 DATA_DIR="/opt/auto-vpn/data"
-SCRIPTS_URL="https://raw.githubusercontent.com/YOUR_USER/auto-vpn-system/main"
+SCRIPTS_URL="https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main"
 
 # ======================== PARSE ARGS ========================
 while [[ $# -gt 0 ]]; do
@@ -95,8 +95,8 @@ log_ok "OS: Ubuntu $OS_VERSION"
 # Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
-    x86_64)  XRAY_ARCH="64"; HYSTERIA_ARCH="amd64" ;;
-    aarch64) XRAY_ARCH="arm64-v8a"; HYSTERIA_ARCH="arm64" ;;
+    x86_64)  XRAY_ARCH="64"; GO_ARCH="amd64" ;;
+    aarch64) XRAY_ARCH="arm64-v8a"; GO_ARCH="arm64" ;;
     *)       log_err "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
 log_ok "Architecture: $ARCH"
@@ -122,10 +122,33 @@ SERVER_IP=$(curl -sf --max-time 10 https://api.ipify.org 2>/dev/null || \
             curl -sf --max-time 10 https://icanhazip.com 2>/dev/null || \
             echo "unknown")
 
-COUNTRY_CODE=$(echo "$GEO_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('country_code', d.get('country', 'XX')))" 2>/dev/null || echo "XX")
-COUNTRY_NAME=$(echo "$GEO_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('country_name', d.get('country', 'Unknown')))" 2>/dev/null || echo "Unknown")
-CITY=$(echo "$GEO_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('city', 'Unknown'))" 2>/dev/null || echo "Unknown")
-ISP=$(echo "$GEO_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('org', d.get('isp', 'Unknown')))" 2>/dev/null || echo "Unknown")
+# Parse geo - handle different API response formats:
+# ipinfo.io:  country="DE", city, org
+# ipapi.co:   country_code="DE", country_name, city, org
+# ip-api.com: countryCode="DE", country, city, isp
+read -r COUNTRY_CODE COUNTRY_NAME CITY ISP < <(echo "$GEO_JSON" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    cc = d.get('country_code') or d.get('countryCode') or d.get('country') or 'XX'
+    # ipinfo.io 'country' is 2-letter code; ip-api.com 'country' is full name
+    if len(cc) > 2:
+        cc = d.get('countryCode', 'XX')
+    name = d.get('country_name') or d.get('country') or 'Unknown'
+    if len(name) == 2:
+        name = 'Unknown'
+    city = d.get('city') or 'Unknown'
+    isp = d.get('org') or d.get('isp') or 'Unknown'
+    print(f'{cc}\t{name}\t{city}\t{isp}')
+except:
+    print('XX\tUnknown\tUnknown\tUnknown')
+" 2>/dev/null || echo "XX	Unknown	Unknown	Unknown")
+
+# Fix if parsing failed
+COUNTRY_CODE="${COUNTRY_CODE:-XX}"
+COUNTRY_NAME="${COUNTRY_NAME:-Unknown}"
+CITY="${CITY:-Unknown}"
+ISP="${ISP:-Unknown}"
 
 # Build node name
 if [[ -z "$NODE_NAME" ]]; then
@@ -147,7 +170,7 @@ apt-get update -qq
 apt-get upgrade -y -qq
 apt-get install -y -qq \
     curl wget unzip jq openssl \
-    python3 python3-pip \
+    python3 \
     qrencode \
     ufw fail2ban \
     cron socat net-tools
@@ -218,24 +241,6 @@ log_info "  UUID: $UUID"
 log_info "  Public Key: $PUBLIC_KEY"
 log_info "  Short ID: $SHORT_ID"
 
-# Save keys to file
-cat > "$DATA_DIR/keys.json" << EOF
-{
-    "node_name": "$NODE_NAME",
-    "server_ip": "$SERVER_IP",
-    "country_code": "$COUNTRY_CODE",
-    "country_name": "$COUNTRY_NAME",
-    "city": "$CITY",
-    "uuid": "$UUID",
-    "private_key": "$PRIVATE_KEY",
-    "public_key": "$PUBLIC_KEY",
-    "short_id": "$SHORT_ID",
-    "port": $MAIN_PORT,
-    "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}
-EOF
-chmod 600 "$DATA_DIR/keys.json"
-
 # ======================== SELECT SNI ========================
 if [[ -z "$SNI_DOMAIN" ]]; then
     # Auto-select good SNI based on country
@@ -248,6 +253,25 @@ if [[ -z "$SNI_DOMAIN" ]]; then
     SNI_DOMAIN="${SNI_MAP[$COUNTRY_CODE]:-${SNI_MAP[DEFAULT]}}"
     log_info "Auto-selected SNI: $SNI_DOMAIN"
 fi
+
+# Save keys to file (after SNI is resolved)
+cat > "$DATA_DIR/keys.json" << EOF
+{
+    "node_name": "$NODE_NAME",
+    "server_ip": "$SERVER_IP",
+    "country_code": "$COUNTRY_CODE",
+    "country_name": "$COUNTRY_NAME",
+    "city": "$CITY",
+    "uuid": "$UUID",
+    "private_key": "$PRIVATE_KEY",
+    "public_key": "$PUBLIC_KEY",
+    "short_id": "$SHORT_ID",
+    "port": $MAIN_PORT,
+    "sni": "$SNI_DOMAIN",
+    "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+chmod 600 "$DATA_DIR/keys.json"
 
 # ======================== XRAY CONFIG ========================
 log_step "Configuring Xray VLESS + REALITY"
@@ -380,16 +404,18 @@ if [[ "$INSTALL_HYSTERIA" == true ]]; then
 
     # Download Hysteria2
     HYSTERIA_VERSION=$(curl -sf "https://api.github.com/repos/apernet/hysteria/releases/latest" | jq -r '.tag_name')
-    HYSTERIA_URL="https://github.com/apernet/hysteria/releases/download/${HYSTERIA_VERSION}/hysteria-linux-${HYSTERIA_ARCH}"
+    HYSTERIA_URL="https://github.com/apernet/hysteria/releases/download/${HYSTERIA_VERSION}/hysteria-linux-${GO_ARCH}"
     wget -q "$HYSTERIA_URL" -O /usr/local/bin/hysteria
     chmod +x /usr/local/bin/hysteria
 
     # Generate self-signed cert for Hysteria
     mkdir -p /etc/hysteria
-    openssl req -x509 -nodes -newkey ec:<(openssl ecparam -name prime256v1) \
+    openssl ecparam -name prime256v1 -out /tmp/ec_param.pem 2>/dev/null
+    openssl req -x509 -nodes -newkey ec:/tmp/ec_param.pem \
         -keyout /etc/hysteria/server.key \
         -out /etc/hysteria/server.crt \
         -subj "/CN=$SNI_DOMAIN" -days 36500 2>/dev/null
+    rm -f /tmp/ec_param.pem
 
     cat > /etc/hysteria/config.yaml << HYSTCONF
 listen: :$HYSTERIA_PORT
@@ -456,7 +482,7 @@ if [[ "$INSTALL_WARP" == true ]]; then
     log_step "Setting up Cloudflare WARP outbound"
 
     # Install wgcf for WARP credentials
-    WGCF_URL="https://github.com/ViRb3/wgcf/releases/latest/download/wgcf_linux_${HYSTERIA_ARCH}"
+    WGCF_URL="https://github.com/ViRb3/wgcf/releases/latest/download/wgcf_linux_${GO_ARCH}"
     wget -q "$WGCF_URL" -O /usr/local/bin/wgcf 2>/dev/null && {
         chmod +x /usr/local/bin/wgcf
 
@@ -495,14 +521,19 @@ import json
 with open("$CONFIG_DIR/config.json") as f:
     cfg = json.load(f)
 warp = json.loads('''$WARP_OUTBOUND''')
+# Insert warp before direct (index 0 = direct, so insert at 1)
 cfg["outbounds"].insert(1, warp)
-# Add routing rule: route all non-blocked through warp
-cfg["routing"]["rules"].append({
+# Route popular services through WARP to hide server IP
+cfg["routing"]["rules"].insert(0, {
     "type": "field",
     "outboundTag": "warp",
-    "network": "tcp,udp"
+    "domain": [
+        "geosite:google",
+        "geosite:netflix",
+        "geosite:openai",
+        "geosite:discord"
+    ]
 })
-# Move direct to last
 with open("$CONFIG_DIR/config.json", "w") as f:
     json.dump(cfg, f, indent=4)
 PYEOF
@@ -516,6 +547,25 @@ PYEOF
         cd - > /dev/null
     } || log_warn "Could not download wgcf, skipping WARP"
 fi
+
+# ======================== LOG ROTATION ========================
+log_step "Configuring log rotation"
+
+cat > /etc/logrotate.d/xray << 'LOGROTATE'
+/var/log/xray/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    postrotate
+        systemctl restart xray > /dev/null 2>&1 || true
+    endscript
+}
+LOGROTATE
+
+log_ok "Log rotation configured (7 days)"
 
 # ======================== FIREWALL ========================
 log_step "Configuring firewall"
@@ -598,14 +648,38 @@ if [[ "$NO_REPORT" == false && -n "$API_URL" ]]; then
 REPORTJSON
 )
 
-    HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
+    # Send registration and capture response
+    REGISTER_RESPONSE=$(curl -sf \
         -X POST "$API_URL/api/nodes/register" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $API_KEY" \
-        -d "$REPORT_DATA" 2>/dev/null) || HTTP_CODE="000"
+        -d "$REPORT_DATA" 2>/dev/null) || REGISTER_RESPONSE=""
 
-    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]]; then
+    HTTP_CODE=$(echo "$REGISTER_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+
+    if [[ -n "$REGISTER_RESPONSE" && "$REGISTER_RESPONSE" == *"node_id"* ]]; then
         log_ok "Node registered at central panel"
+
+        # Extract node_id from response
+        NODE_ID=$(echo "$REGISTER_RESPONSE" | jq -r '.node_id // empty' 2>/dev/null) || true
+
+        if [[ -n "$NODE_ID" ]]; then
+            # Save heartbeat config
+            cat > "$DATA_DIR/heartbeat.conf" << HBEOF
+API_URL="$API_URL"
+API_KEY="$API_KEY"
+NODE_ID="$NODE_ID"
+HBEOF
+            chmod 600 "$DATA_DIR/heartbeat.conf"
+
+            # Download heartbeat script
+            curl -sf "$SCRIPTS_URL/scripts/heartbeat.sh" -o "$INSTALL_DIR/heartbeat.sh" 2>/dev/null || true
+            chmod +x "$INSTALL_DIR/heartbeat.sh" 2>/dev/null || true
+
+            # Setup cron: run every 5 minutes
+            (crontab -l 2>/dev/null | grep -v "heartbeat.sh"; echo "*/5 * * * * $INSTALL_DIR/heartbeat.sh") | crontab -
+            log_ok "Heartbeat cron configured (every 5 min)"
+        fi
     else
         log_warn "Failed to report to panel (HTTP $HTTP_CODE). You can do it manually later."
     fi
