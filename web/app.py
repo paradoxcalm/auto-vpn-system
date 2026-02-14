@@ -15,7 +15,9 @@ from functools import wraps
 from flask import Flask, request, jsonify, render_template, abort, session, redirect, url_for
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", secrets.token_urlsafe(32))
+# Secret key MUST be stable across workers — read from env or derive from API_KEY
+_api = os.environ.get("API_KEY", "")
+app.secret_key = os.environ.get("SECRET_KEY", hashlib.sha256(_api.encode()).hexdigest() if _api else secrets.token_urlsafe(32))
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/opt/auto-vpn-panel/data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
