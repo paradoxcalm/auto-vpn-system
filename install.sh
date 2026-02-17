@@ -155,10 +155,13 @@ apt-get update -qq
 apt-get upgrade -y -qq
 apt-get install -y -qq \
     curl wget unzip jq openssl \
-    python3 nginx \
+    python3 python3-pip nginx \
     qrencode \
     ufw fail2ban \
     cron socat net-tools
+
+# Install speedtest-cli for bandwidth monitoring
+pip3 install speedtest-cli -q 2>/dev/null || true
 
 log_ok "Dependencies installed"
 

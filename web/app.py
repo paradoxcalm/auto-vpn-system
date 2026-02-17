@@ -158,7 +158,9 @@ def api_delete_node(node_id):
 @require_api_key
 def heartbeat(node_id):
     db = get_db()
-    models.update_node_heartbeat(db, node_id)
+    data = request.get_json(silent=True) or {}
+    metrics = data.get("metrics")
+    models.update_node_heartbeat(db, node_id, metrics=metrics)
     return jsonify({"status": "ok"})
 
 

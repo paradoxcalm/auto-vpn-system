@@ -47,7 +47,17 @@ CREATE TABLE IF NOT EXISTS nodes (
     status              TEXT DEFAULT 'online',
     last_seen           TEXT,
     installed_at        TEXT,
-    created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    -- Monitoring metrics (updated by heartbeat)
+    ping_ms             REAL DEFAULT 0,
+    download_mbps       REAL DEFAULT 0,
+    upload_mbps         REAL DEFAULT 0,
+    cpu_percent         REAL DEFAULT 0,
+    ram_percent         REAL DEFAULT 0,
+    disk_percent        REAL DEFAULT 0,
+    connections         INTEGER DEFAULT 0,
+    uptime_seconds      INTEGER DEFAULT 0,
+    metrics_updated_at  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS traffic_logs (
@@ -132,6 +142,9 @@ def init_db(data_dir):
     db = get_db()
     db.executescript(SCHEMA)
 
+    # Migrate: add monitoring columns to existing nodes table
+    _migrate_add_node_metrics(db)
+
     # Seed default settings
     for key, value in DEFAULT_SETTINGS.items():
         db.execute(
@@ -146,6 +159,25 @@ def init_db(data_dir):
 
     db.commit()
     db.close()
+
+
+def _migrate_add_node_metrics(db):
+    """Add monitoring columns to nodes table if they don't exist."""
+    columns = [r[1] for r in db.execute("PRAGMA table_info(nodes)").fetchall()]
+    new_cols = {
+        "ping_ms": "REAL DEFAULT 0",
+        "download_mbps": "REAL DEFAULT 0",
+        "upload_mbps": "REAL DEFAULT 0",
+        "cpu_percent": "REAL DEFAULT 0",
+        "ram_percent": "REAL DEFAULT 0",
+        "disk_percent": "REAL DEFAULT 0",
+        "connections": "INTEGER DEFAULT 0",
+        "uptime_seconds": "INTEGER DEFAULT 0",
+        "metrics_updated_at": "TEXT",
+    }
+    for col, col_type in new_cols.items():
+        if col not in columns:
+            db.execute(f"ALTER TABLE nodes ADD COLUMN {col} {col_type}")
 
 
 def _migrate_nodes_json(db, nodes_json_path):
@@ -468,11 +500,36 @@ def delete_node(db, node_id):
     db.commit()
 
 
-def update_node_heartbeat(db, node_id):
-    db.execute(
-        "UPDATE nodes SET last_seen = ?, status = 'online' WHERE id = ?",
-        (datetime.now(timezone.utc).isoformat(), node_id),
-    )
+def update_node_heartbeat(db, node_id, metrics=None):
+    """Update node heartbeat with optional performance metrics."""
+    now = datetime.now(timezone.utc).isoformat()
+
+    if metrics:
+        db.execute(
+            """UPDATE nodes SET last_seen = ?, status = 'online',
+               ping_ms = ?, download_mbps = ?, upload_mbps = ?,
+               cpu_percent = ?, ram_percent = ?, disk_percent = ?,
+               connections = ?, uptime_seconds = ?, metrics_updated_at = ?
+               WHERE id = ?""",
+            (
+                now,
+                metrics.get("ping_ms", 0),
+                metrics.get("download_mbps", 0),
+                metrics.get("upload_mbps", 0),
+                metrics.get("cpu_percent", 0),
+                metrics.get("ram_percent", 0),
+                metrics.get("disk_percent", 0),
+                metrics.get("connections", 0),
+                metrics.get("uptime_seconds", 0),
+                now,
+                node_id,
+            ),
+        )
+    else:
+        db.execute(
+            "UPDATE nodes SET last_seen = ?, status = 'online' WHERE id = ?",
+            (now, node_id),
+        )
     db.commit()
 
 

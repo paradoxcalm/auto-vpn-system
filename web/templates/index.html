@@ -161,6 +161,47 @@
         .text-dim { color: var(--dim); }
         .mt-4 { margin-top: 4px; } .mt-8 { margin-top: 8px; }
 
+        /* Node metrics */
+        .node-metrics {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+            margin: 12px 0; padding: 12px; background: rgba(255,255,255,0.02);
+            border-radius: 10px; border: 1px solid rgba(255,255,255,0.04);
+        }
+        .metric {
+            text-align: center;
+        }
+        .metric-val {
+            font-size: 1.05em; font-weight: 700;
+        }
+        .metric-label {
+            font-size: 0.6em; color: var(--dim); text-transform: uppercase;
+            letter-spacing: 0.5px; margin-top: 2px;
+        }
+        .metric-val.good { color: var(--green); }
+        .metric-val.warn { color: var(--orange); }
+        .metric-val.bad { color: var(--red); }
+
+        .node-bars {
+            display: flex; gap: 10px; margin: 8px 0;
+        }
+        .bar-group {
+            flex: 1;
+        }
+        .bar-header {
+            display: flex; justify-content: space-between; font-size: 0.7em; color: var(--dim);
+            margin-bottom: 3px;
+        }
+        .bar-track {
+            width: 100%; height: 5px; background: rgba(255,255,255,0.06);
+            border-radius: 3px; overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%; border-radius: 3px; transition: width 0.3s;
+        }
+        .bar-fill.green { background: var(--green); }
+        .bar-fill.orange { background: var(--orange); }
+        .bar-fill.red { background: var(--red); }
+
         /* Referral table */
         .ref-table { width: 100%; }
 
@@ -486,7 +527,29 @@ async function loadNodes() {
         return;
     }
 
-    grid.innerHTML = nodes.map(n => `
+    grid.innerHTML = nodes.map(n => {
+        const ping = n.ping_ms || 0;
+        const dl = n.download_mbps || 0;
+        const ul = n.upload_mbps || 0;
+        const cpu = n.cpu_percent || 0;
+        const ram = n.ram_percent || 0;
+        const disk = n.disk_percent || 0;
+        const conns = n.connections || 0;
+        const uptime = n.uptime_seconds || 0;
+
+        // Color helpers
+        const pingColor = ping === 0 ? '' : ping < 50 ? 'good' : ping < 150 ? 'warn' : 'bad';
+        const cpuColor = cpu < 50 ? 'good' : cpu < 80 ? 'warn' : 'bad';
+        const ramColor = ram < 60 ? 'good' : ram < 85 ? 'warn' : 'bad';
+        const diskColor = disk < 70 ? 'good' : disk < 90 ? 'warn' : 'bad';
+        const barColor = v => v < 50 ? 'green' : v < 80 ? 'orange' : 'red';
+
+        // Format uptime
+        const days = Math.floor(uptime / 86400);
+        const hours = Math.floor((uptime % 86400) / 3600);
+        const uptimeStr = uptime > 0 ? (days > 0 ? days + 'd ' + hours + 'h' : hours + 'h') : '--';
+
+        return `
         <div class="node-card">
             <div class="node-top">
                 <div>
@@ -500,12 +563,50 @@ async function loadNodes() {
                 ${n.cf_domain ? esc(n.cf_domain) : esc(n.server_ip)}
                 ${n.xray_version ? ' &middot; Xray ' + esc(n.xray_version) : ''}
             </div>
-            <div class="node-actions">
-                ${n.vless_link ? '<button class="btn-action" onclick="copyText(\'' + escAttr(n.vless_link) + '\')">Copy Link</button>' : ''}
-                <button class="btn-action danger" onclick="deleteNode(\'${n.id}\', \'${esc(n.node_name)}\')">Delete</button>
+
+            <div class="node-metrics">
+                <div class="metric">
+                    <div class="metric-val ${pingColor}">${ping > 0 ? ping.toFixed(0) + ' ms' : '--'}</div>
+                    <div class="metric-label">Ping</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-val">${dl > 0 ? dl.toFixed(0) : '--'}</div>
+                    <div class="metric-label">DL Mbps</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-val">${ul > 0 ? ul.toFixed(0) : '--'}</div>
+                    <div class="metric-label">UL Mbps</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-val">${conns}</div>
+                    <div class="metric-label">Conns</div>
+                </div>
             </div>
-        </div>
-    `).join('');
+
+            <div class="node-bars">
+                <div class="bar-group">
+                    <div class="bar-header"><span>CPU</span><span class="${cpuColor}">${cpu.toFixed(0)}%</span></div>
+                    <div class="bar-track"><div class="bar-fill ${barColor(cpu)}" style="width:${cpu}%"></div></div>
+                </div>
+                <div class="bar-group">
+                    <div class="bar-header"><span>RAM</span><span class="${ramColor}">${ram.toFixed(0)}%</span></div>
+                    <div class="bar-track"><div class="bar-fill ${barColor(ram)}" style="width:${ram}%"></div></div>
+                </div>
+                <div class="bar-group">
+                    <div class="bar-header"><span>Disk</span><span class="${diskColor}">${disk.toFixed(0)}%</span></div>
+                    <div class="bar-track"><div class="bar-fill ${barColor(disk)}" style="width:${disk}%"></div></div>
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+                <span style="font-size:0.7em;color:var(--dim)">Uptime: ${uptimeStr}</span>
+                <div class="node-actions">
+                    ${n.vless_link ? `<button class="btn-action" onclick="copyText('${escAttr(n.vless_link)}')">Copy Link</button>` : ''}
+                    <button class="btn-action danger" onclick="deleteNode('${n.id}', '${esc(n.node_name)}')">Delete</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 async function deleteNode(id, name) {
