@@ -1,19 +1,16 @@
 #!/bin/bash
 #===============================================================================
-# AUTO-VPN SYSTEM — Main Installer
-# Автоматическая установка VPN-ноды с определением гео и отправкой ключа
+# AUTO-VPN SYSTEM — Node Installer (Cloudflare CDN Edition)
+# Автоматическая установка VPN-ноды: VLESS + WebSocket + Nginx + Cloudflare
 #
-# Usage: curl -sSL https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main/install.sh | bash
-#    or: bash install.sh [OPTIONS]
+# Usage:
+#   curl -sSL https://raw.githubusercontent.com/ParadoxCalm/auto-vpn-system/main/install.sh | bash -s -- \
+#     --api-url http://PANEL_IP --api-key YOUR_KEY --domain SUB.jetsflare.com
 #
 # Options:
-#   --api-url URL        Central panel API URL to send keys to
-#   --api-key KEY        API key for authentication
-#   --sni DOMAIN         SNI domain for REALITY (default: auto-select)
-#   --port PORT          Main VLESS port (default: 443)
-#   --hysteria           Also install Hysteria2
-#   --warp               Also setup Cloudflare WARP outbound
-#   --panel              Also install 3X-UI management panel
+#   --api-url URL        Central panel URL
+#   --api-key KEY        API key for panel auth
+#   --domain DOMAIN      Cloudflare subdomain (e.g. nl.jetsflare.com)
 #   --name NAME          Custom node name (default: auto from geo)
 #   --no-report          Don't send keys to central panel
 #===============================================================================
@@ -38,34 +35,35 @@ log_step()  { echo -e "\n${CYAN}${BOLD}▶ $1${NC}"; }
 # ======================== DEFAULTS ========================
 API_URL=""
 API_KEY=""
-SNI_DOMAIN=""
-MAIN_PORT=443
-INSTALL_HYSTERIA=false
-INSTALL_WARP=false
-INSTALL_PANEL=false
+CF_DOMAIN=""
 NODE_NAME=""
 NO_REPORT=false
+XRAY_PORT=10001
+WS_PATH="/ws"
 
 INSTALL_DIR="/opt/auto-vpn"
 CONFIG_DIR="/etc/xray"
 DATA_DIR="/opt/auto-vpn/data"
-SCRIPTS_URL="https://raw.githubusercontent.com/paradoxcalm/auto-vpn-system/main"
+SCRIPTS_URL="https://raw.githubusercontent.com/ParadoxCalm/auto-vpn-system/main"
 
 # ======================== PARSE ARGS ========================
 while [[ $# -gt 0 ]]; do
     case $1 in
         --api-url)   API_URL="$2"; shift 2 ;;
         --api-key)   API_KEY="$2"; shift 2 ;;
-        --sni)       SNI_DOMAIN="$2"; shift 2 ;;
-        --port)      MAIN_PORT="$2"; shift 2 ;;
-        --hysteria)  INSTALL_HYSTERIA=true; shift ;;
-        --warp)      INSTALL_WARP=true; shift ;;
-        --panel)     INSTALL_PANEL=true; shift ;;
+        --domain)    CF_DOMAIN="$2"; shift 2 ;;
         --name)      NODE_NAME="$2"; shift 2 ;;
         --no-report) NO_REPORT=true; shift ;;
         *)           log_err "Unknown option: $1"; exit 1 ;;
     esac
 done
+
+# ======================== VALIDATE ========================
+if [[ -z "$CF_DOMAIN" ]]; then
+    log_err "--domain is required (e.g. --domain nl.jetsflare.com)"
+    log_err "This must be a Cloudflare-proxied subdomain pointing to this server's IP"
+    exit 1
+fi
 
 # ======================== PRE-CHECKS ========================
 log_step "Pre-flight checks"
@@ -75,7 +73,6 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Detect OS
 if [[ -f /etc/os-release ]]; then
     . /etc/os-release
     OS_NAME="$ID"
@@ -92,11 +89,10 @@ fi
 
 log_ok "OS: Ubuntu $OS_VERSION"
 
-# Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
-    x86_64)  XRAY_ARCH="64"; GO_ARCH="amd64" ;;
-    aarch64) XRAY_ARCH="arm64-v8a"; GO_ARCH="arm64" ;;
+    x86_64)  XRAY_ARCH="64" ;;
+    aarch64) XRAY_ARCH="arm64-v8a" ;;
     *)       log_err "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
 log_ok "Architecture: $ARCH"
@@ -106,12 +102,10 @@ log_step "Detecting server location"
 
 detect_geo() {
     local geo_json
-    # Try multiple APIs for reliability
     geo_json=$(curl -sf --max-time 10 "https://ipinfo.io/json" 2>/dev/null) || \
     geo_json=$(curl -sf --max-time 10 "https://ipapi.co/json" 2>/dev/null) || \
     geo_json=$(curl -sf --max-time 10 "http://ip-api.com/json" 2>/dev/null) || \
-    { log_warn "Could not detect geo, using defaults"; echo '{}'; return; }
-
+    { log_warn "Could not detect geo"; echo '{}'; return; }
     echo "$geo_json"
 }
 
@@ -119,19 +113,13 @@ GEO_JSON=$(detect_geo)
 
 SERVER_IP=$(curl -sf --max-time 10 https://api.ipify.org 2>/dev/null || \
             curl -sf --max-time 10 https://ifconfig.me 2>/dev/null || \
-            curl -sf --max-time 10 https://icanhazip.com 2>/dev/null || \
             echo "unknown")
 
-# Parse geo - handle different API response formats:
-# ipinfo.io:  country="DE", city, org
-# ipapi.co:   country_code="DE", country_name, city, org
-# ip-api.com: countryCode="DE", country, city, isp
 read -r COUNTRY_CODE COUNTRY_NAME CITY ISP < <(echo "$GEO_JSON" | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
     cc = d.get('country_code') or d.get('countryCode') or d.get('country') or 'XX'
-    # ipinfo.io 'country' is 2-letter code; ip-api.com 'country' is full name
     if len(cc) > 2:
         cc = d.get('countryCode', 'XX')
     name = d.get('country_name') or d.get('country') or 'Unknown'
@@ -144,33 +132,30 @@ except:
     print('XX\tUnknown\tUnknown\tUnknown')
 " 2>/dev/null || echo "XX	Unknown	Unknown	Unknown")
 
-# Fix if parsing failed
 COUNTRY_CODE="${COUNTRY_CODE:-XX}"
 COUNTRY_NAME="${COUNTRY_NAME:-Unknown}"
 CITY="${CITY:-Unknown}"
 ISP="${ISP:-Unknown}"
 
-# Build node name
 if [[ -z "$NODE_NAME" ]]; then
-    # Format: 🇩🇪 DE-Frankfurt or US-NewYork
     CITY_CLEAN=$(echo "$CITY" | tr ' ' '-' | tr -cd '[:alnum:]-')
     NODE_NAME="${COUNTRY_CODE}-${CITY_CLEAN}"
 fi
 
 log_ok "IP: $SERVER_IP"
 log_ok "Location: $CITY, $COUNTRY_NAME ($COUNTRY_CODE)"
-log_ok "ISP: $ISP"
 log_ok "Node name: $NODE_NAME"
+log_ok "Cloudflare domain: $CF_DOMAIN"
 
-# ======================== SYSTEM SETUP ========================
-log_step "Updating system and installing dependencies"
+# ======================== INSTALL DEPS ========================
+log_step "Installing dependencies"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get upgrade -y -qq
 apt-get install -y -qq \
     curl wget unzip jq openssl \
-    python3 \
+    python3 nginx \
     qrencode \
     ufw fail2ban \
     cron socat net-tools
@@ -180,9 +165,8 @@ log_ok "Dependencies installed"
 # ======================== TCP BBR ========================
 log_step "Enabling TCP BBR"
 
-if ! sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
+if ! sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
     cat >> /etc/sysctl.conf << 'SYSCTL'
-# TCP BBR optimization
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 net.ipv4.tcp_fastopen = 3
@@ -202,13 +186,11 @@ else
     log_ok "TCP BBR already active"
 fi
 
-# ======================== CREATE DIRS ========================
+# ======================== INSTALL XRAY ========================
+log_step "Installing Xray-core"
+
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR"
 
-# ======================== GENERATE KEYS ========================
-log_step "Generating cryptographic keys"
-
-# Install Xray first to use its key generation
 XRAY_VERSION=$(curl -sf "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r '.tag_name' | tr -d 'v')
 XRAY_URL="https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-${XRAY_ARCH}.zip"
 
@@ -217,66 +199,21 @@ wget -q "$XRAY_URL" -O /tmp/xray.zip
 unzip -qo /tmp/xray.zip -d /tmp/xray
 cp /tmp/xray/xray /usr/local/bin/xray
 chmod +x /usr/local/bin/xray
-cp /tmp/xray/*.dat /usr/local/share/xray/ 2>/dev/null || {
-    mkdir -p /usr/local/share/xray
-    cp /tmp/xray/*.dat /usr/local/share/xray/
-}
+mkdir -p /usr/local/share/xray
+cp /tmp/xray/*.dat /usr/local/share/xray/ 2>/dev/null || true
 rm -rf /tmp/xray /tmp/xray.zip
 
 log_ok "Xray-core v${XRAY_VERSION} installed"
 
-# Generate x25519 keypair
-# Xray v24: "Private key: xxx" / "Public key: xxx"
-# Xray v26: "PrivateKey: xxx" / "Password: xxx" / "Hash32: xxx"
-KEYS=$(/usr/local/bin/xray x25519)
-PRIVATE_KEY=$(echo "$KEYS" | grep -i "private" | awk '{print $NF}')
-PUBLIC_KEY=$(echo "$KEYS" | grep -iE "public|password" | head -1 | awk '{print $NF}')
+# ======================== GENERATE UUID ========================
+log_step "Generating keys"
 
-# Generate UUID
 UUID=$(/usr/local/bin/xray uuid)
 
-# Generate short ID (8 hex chars)
-SHORT_ID=$(openssl rand -hex 8)
+log_ok "UUID: $UUID"
 
-log_ok "Keys generated"
-log_info "  UUID: $UUID"
-log_info "  Public Key: $PUBLIC_KEY"
-log_info "  Short ID: $SHORT_ID"
-
-# ======================== SELECT SNI ========================
-if [[ -z "$SNI_DOMAIN" ]]; then
-    # Auto-select good SNI based on country
-    declare -A SNI_MAP=(
-        ["RU"]="www.microsoft.com"
-        ["CN"]="www.samsung.com"
-        ["IR"]="www.speedtest.net"
-        ["DEFAULT"]="www.google.com"
-    )
-    SNI_DOMAIN="${SNI_MAP[$COUNTRY_CODE]:-${SNI_MAP[DEFAULT]}}"
-    log_info "Auto-selected SNI: $SNI_DOMAIN"
-fi
-
-# Save keys to file (after SNI is resolved)
-cat > "$DATA_DIR/keys.json" << EOF
-{
-    "node_name": "$NODE_NAME",
-    "server_ip": "$SERVER_IP",
-    "country_code": "$COUNTRY_CODE",
-    "country_name": "$COUNTRY_NAME",
-    "city": "$CITY",
-    "uuid": "$UUID",
-    "private_key": "$PRIVATE_KEY",
-    "public_key": "$PUBLIC_KEY",
-    "short_id": "$SHORT_ID",
-    "port": $MAIN_PORT,
-    "sni": "$SNI_DOMAIN",
-    "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}
-EOF
-chmod 600 "$DATA_DIR/keys.json"
-
-# ======================== XRAY CONFIG ========================
-log_step "Configuring Xray VLESS + REALITY"
+# ======================== XRAY CONFIG (VLESS + WebSocket) ========================
+log_step "Configuring Xray (VLESS + WebSocket)"
 
 cat > "$CONFIG_DIR/config.json" << XRAYCONF
 {
@@ -287,70 +224,40 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
     },
     "inbounds": [
         {
-            "tag": "vless-reality",
-            "listen": "0.0.0.0",
-            "port": $MAIN_PORT,
+            "tag": "vless-ws",
+            "listen": "127.0.0.1",
+            "port": $XRAY_PORT,
             "protocol": "vless",
             "settings": {
                 "clients": [
                     {
                         "id": "$UUID",
-                        "flow": "xtls-rprx-vision",
                         "email": "default@$NODE_NAME"
                     }
                 ],
                 "decryption": "none"
             },
             "streamSettings": {
-                "network": "tcp",
-                "security": "reality",
-                "realitySettings": {
-                    "show": false,
-                    "dest": "${SNI_DOMAIN}:443",
-                    "xver": 0,
-                    "serverNames": [
-                        "$SNI_DOMAIN"
-                    ],
-                    "privateKey": "$PRIVATE_KEY",
-                    "shortIds": [
-                        "$SHORT_ID",
-                        ""
-                    ]
+                "network": "ws",
+                "wsSettings": {
+                    "path": "$WS_PATH"
                 }
             },
             "sniffing": {
                 "enabled": true,
-                "destOverride": [
-                    "http",
-                    "tls",
-                    "quic"
-                ]
+                "destOverride": ["http", "tls", "quic"]
             }
         }
     ],
     "outbounds": [
-        {
-            "tag": "direct",
-            "protocol": "freedom"
-        },
-        {
-            "tag": "block",
-            "protocol": "blackhole"
-        }
+        {"tag": "direct", "protocol": "freedom"},
+        {"tag": "block", "protocol": "blackhole"}
     ],
     "routing": {
         "domainStrategy": "IPIfNonMatch",
         "rules": [
-            {
-                "type": "field",
-                "outboundTag": "block",
-                "protocol": ["bittorrent"]
-            },
-            {
-                "type": "field",
-                "outboundTag": "block",
-                "ip": ["geoip:private"]
-            }
+            {"type": "field", "outboundTag": "block", "protocol": ["bittorrent"]},
+            {"type": "field", "outboundTag": "block", "ip": ["geoip:private"]}
         ]
     }
 }
@@ -360,10 +267,10 @@ mkdir -p /var/log/xray
 chown -R nobody:nogroup /var/log/xray
 chmod 755 /var/log/xray
 
-log_ok "Xray config created"
+log_ok "Xray config created (VLESS+WS on 127.0.0.1:$XRAY_PORT)"
 
-# ======================== SYSTEMD SERVICE ========================
-log_step "Creating systemd service"
+# ======================== XRAY SERVICE ========================
+log_step "Creating Xray service"
 
 cat > /etc/systemd/system/xray.service << 'SERVICE'
 [Unit]
@@ -390,186 +297,69 @@ systemctl daemon-reload
 systemctl enable xray
 systemctl start xray
 
-# Verify
 sleep 2
 if systemctl is-active --quiet xray; then
     log_ok "Xray service is running"
 else
     log_err "Xray failed to start. Check: journalctl -u xray"
-    journalctl -u xray --no-pager -n 20
+    journalctl -u xray --no-pager -n 10
 fi
 
-# ======================== OPTIONAL: HYSTERIA2 ========================
-if [[ "$INSTALL_HYSTERIA" == true ]]; then
-    log_step "Installing Hysteria2"
+# ======================== SSL CERTIFICATE ========================
+log_step "Generating SSL certificate for Cloudflare"
 
-    HYSTERIA_PORT=8443
-    HYSTERIA_PASSWORD=$(openssl rand -base64 32)
+mkdir -p /etc/nginx/ssl
+openssl req -x509 -nodes -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/cloudflare.key \
+    -out /etc/nginx/ssl/cloudflare.pem \
+    -days 3650 -subj "/CN=$CF_DOMAIN" 2>/dev/null
 
-    # Download Hysteria2
-    HYSTERIA_VERSION=$(curl -sf "https://api.github.com/repos/apernet/hysteria/releases/latest" | jq -r '.tag_name')
-    HYSTERIA_URL="https://github.com/apernet/hysteria/releases/download/${HYSTERIA_VERSION}/hysteria-linux-${GO_ARCH}"
-    wget -q "$HYSTERIA_URL" -O /usr/local/bin/hysteria
-    chmod +x /usr/local/bin/hysteria
+log_ok "SSL certificate generated"
 
-    # Generate self-signed cert for Hysteria
-    mkdir -p /etc/hysteria
-    openssl ecparam -name prime256v1 -out /tmp/ec_param.pem 2>/dev/null
-    openssl req -x509 -nodes -newkey ec:/tmp/ec_param.pem \
-        -keyout /etc/hysteria/server.key \
-        -out /etc/hysteria/server.crt \
-        -subj "/CN=$SNI_DOMAIN" -days 36500 2>/dev/null
-    rm -f /tmp/ec_param.pem
+# ======================== NGINX (WebSocket Reverse Proxy) ========================
+log_step "Configuring Nginx reverse proxy"
 
-    cat > /etc/hysteria/config.yaml << HYSTCONF
-listen: :$HYSTERIA_PORT
+cat > /etc/nginx/sites-available/vless-ws << NGINXEOF
+server {
+    listen 443 ssl http2;
+    server_name $CF_DOMAIN;
 
-tls:
-  cert: /etc/hysteria/server.crt
-  key: /etc/hysteria/server.key
+    ssl_certificate /etc/nginx/ssl/cloudflare.pem;
+    ssl_certificate_key /etc/nginx/ssl/cloudflare.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
 
-auth:
-  type: password
-  password: $HYSTERIA_PASSWORD
+    # WebSocket proxy to Xray
+    location $WS_PATH {
+        proxy_redirect off;
+        proxy_pass http://127.0.0.1:$XRAY_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
 
-masquerade:
-  type: proxy
-  proxy:
-    url: https://$SNI_DOMAIN
-    rewriteHost: true
-
-bandwidth:
-  up: 1 gbps
-  down: 1 gbps
-
-quic:
-  initStreamReceiveWindow: 8388608
-  maxStreamReceiveWindow: 8388608
-  initConnReceiveWindow: 20971520
-  maxConnReceiveWindow: 20971520
-HYSTCONF
-
-    cat > /etc/systemd/system/hysteria.service << 'HYSTSERVICE'
-[Unit]
-Description=Hysteria2 Service
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/hysteria server -c /etc/hysteria/config.yaml
-Restart=on-failure
-RestartSec=5
-LimitNOFILE=1048576
-
-[Install]
-WantedBy=multi-user.target
-HYSTSERVICE
-
-    systemctl daemon-reload
-    systemctl enable hysteria
-    systemctl start hysteria
-
-    # Save hysteria data
-    cat > "$DATA_DIR/hysteria.json" << EOF
-{
-    "port": $HYSTERIA_PORT,
-    "password": "$HYSTERIA_PASSWORD",
-    "sni": "$SNI_DOMAIN"
-}
-EOF
-    chmod 600 "$DATA_DIR/hysteria.json"
-
-    log_ok "Hysteria2 installed on port $HYSTERIA_PORT"
-fi
-
-# ======================== OPTIONAL: WARP ========================
-if [[ "$INSTALL_WARP" == true ]]; then
-    log_step "Setting up Cloudflare WARP outbound"
-
-    # Install wgcf for WARP credentials
-    WGCF_URL="https://github.com/ViRb3/wgcf/releases/latest/download/wgcf_linux_${GO_ARCH}"
-    wget -q "$WGCF_URL" -O /usr/local/bin/wgcf 2>/dev/null && {
-        chmod +x /usr/local/bin/wgcf
-
-        cd /tmp
-        /usr/local/bin/wgcf register --accept-tos 2>/dev/null || true
-        /usr/local/bin/wgcf generate 2>/dev/null || true
-
-        if [[ -f /tmp/wgcf-profile.conf ]]; then
-            WARP_PRIVATE=$(grep "PrivateKey" /tmp/wgcf-profile.conf | awk -F'= ' '{print $2}')
-            WARP_ADDRESS4=$(grep "Address" /tmp/wgcf-profile.conf | grep -v ":" | awk -F'= ' '{print $2}')
-            WARP_ADDRESS6=$(grep "Address" /tmp/wgcf-profile.conf | grep ":" | awk -F'= ' '{print $2}')
-
-            # Add WARP outbound to Xray config
-            WARP_OUTBOUND=$(cat << WARPJSON
-{
-    "tag": "warp",
-    "protocol": "wireguard",
-    "settings": {
-        "secretKey": "$WARP_PRIVATE",
-        "address": ["$WARP_ADDRESS4", "$WARP_ADDRESS6"],
-        "peers": [
-            {
-                "publicKey": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-                "allowedIPs": ["0.0.0.0/0", "::/0"],
-                "endpoint": "engage.cloudflareclient.com:2408"
-            }
-        ],
-        "mtu": 1280
+    # Normal page — looks like regular website
+    location / {
+        return 200 '<!DOCTYPE html><html><head><title>Welcome</title></head><body><h1>Welcome to $CF_DOMAIN</h1></body></html>';
+        add_header Content-Type text/html;
     }
 }
-WARPJSON
-)
-            # Update xray config to add warp outbound
-            python3 << PYEOF
-import json
-with open("$CONFIG_DIR/config.json") as f:
-    cfg = json.load(f)
-warp = json.loads('''$WARP_OUTBOUND''')
-# Insert warp before direct (index 0 = direct, so insert at 1)
-cfg["outbounds"].insert(1, warp)
-# Route popular services through WARP to hide server IP
-cfg["routing"]["rules"].insert(0, {
-    "type": "field",
-    "outboundTag": "warp",
-    "domain": [
-        "geosite:google",
-        "geosite:netflix",
-        "geosite:openai",
-        "geosite:discord"
-    ]
-})
-with open("$CONFIG_DIR/config.json", "w") as f:
-    json.dump(cfg, f, indent=4)
-PYEOF
 
-            systemctl restart xray
-            log_ok "Cloudflare WARP outbound configured"
-        else
-            log_warn "Could not generate WARP profile, skipping"
-        fi
-
-        cd - > /dev/null
-    } || log_warn "Could not download wgcf, skipping WARP"
-fi
-
-# ======================== LOG ROTATION ========================
-log_step "Configuring log rotation"
-
-cat > /etc/logrotate.d/xray << 'LOGROTATE'
-/var/log/xray/*.log {
-    daily
-    rotate 7
-    compress
-    delaycompress
-    missingok
-    notifempty
-    postrotate
-        systemctl restart xray > /dev/null 2>&1 || true
-    endscript
+server {
+    listen 80;
+    server_name $CF_DOMAIN;
+    return 301 https://\$host\$request_uri;
 }
-LOGROTATE
+NGINXEOF
 
-log_ok "Log rotation configured (7 days)"
+ln -sf /etc/nginx/sites-available/vless-ws /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+
+nginx -t 2>/dev/null && systemctl restart nginx
+log_ok "Nginx configured ($CF_DOMAIN:443 → Xray WS)"
 
 # ======================== FIREWALL ========================
 log_step "Configuring firewall"
@@ -578,14 +368,10 @@ ufw --force reset > /dev/null 2>&1
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow ssh
-ufw allow "$MAIN_PORT"/tcp
-
-if [[ "$INSTALL_HYSTERIA" == true ]]; then
-    ufw allow 8443/udp
-fi
-
+ufw allow 80/tcp
+ufw allow 443/tcp
 ufw --force enable > /dev/null 2>&1
-log_ok "Firewall configured"
+log_ok "Firewall configured (SSH, 80, 443)"
 
 # ======================== FAIL2BAN ========================
 log_step "Configuring fail2ban"
@@ -607,68 +393,85 @@ systemctl enable fail2ban
 systemctl restart fail2ban
 log_ok "Fail2ban configured"
 
-# ======================== GENERATE CLIENT CONFIG ========================
+# ======================== LOG ROTATION ========================
+cat > /etc/logrotate.d/xray << 'LOGROTATE'
+/var/log/xray/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    postrotate
+        systemctl restart xray > /dev/null 2>&1 || true
+    endscript
+}
+LOGROTATE
+
+log_ok "Log rotation configured"
+
+# ======================== GENERATE CLIENT LINK ========================
 log_step "Generating client configuration"
 
-# VLESS share link
-VLESS_LINK="vless://${UUID}@${SERVER_IP}:${MAIN_PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI_DOMAIN}&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp&headerType=none#${NODE_NAME}"
+VLESS_LINK="vless://${UUID}@${CF_DOMAIN}:443?encryption=none&security=tls&sni=${CF_DOMAIN}&fp=chrome&type=ws&path=%2Fws&host=${CF_DOMAIN}#${NODE_NAME}"
 
 echo "$VLESS_LINK" > "$DATA_DIR/vless-link.txt"
 
-# Generate QR code
+# Save node data
+cat > "$DATA_DIR/keys.json" << EOF
+{
+    "node_name": "$NODE_NAME",
+    "server_ip": "$SERVER_IP",
+    "cf_domain": "$CF_DOMAIN",
+    "country_code": "$COUNTRY_CODE",
+    "country_name": "$COUNTRY_NAME",
+    "city": "$CITY",
+    "uuid": "$UUID",
+    "ws_path": "$WS_PATH",
+    "xray_port": $XRAY_PORT,
+    "vless_link": "$VLESS_LINK",
+    "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+chmod 600 "$DATA_DIR/keys.json"
+
+# QR code
 qrencode -t UTF8 "$VLESS_LINK" > "$DATA_DIR/qr-code.txt" 2>/dev/null || true
-qrencode -t PNG -o "$DATA_DIR/qr-code.png" "$VLESS_LINK" 2>/dev/null || true
 
-# Hysteria link if installed
-HYSTERIA_LINK=""
-if [[ "$INSTALL_HYSTERIA" == true ]]; then
-    HYSTERIA_LINK="hysteria2://${HYSTERIA_PASSWORD}@${SERVER_IP}:8443?insecure=1&sni=${SNI_DOMAIN}#${NODE_NAME}-HY2"
-    echo "$HYSTERIA_LINK" > "$DATA_DIR/hysteria-link.txt"
-fi
-
-# ======================== REPORT TO CENTRAL PANEL ========================
-if [[ "$NO_REPORT" == false && -n "$API_URL" ]]; then
+# ======================== REPORT TO PANEL ========================
+if [[ "$NO_REPORT" == false && -n "$API_URL" && -n "$API_KEY" ]]; then
     log_step "Reporting to central panel"
 
     REPORT_DATA=$(cat << REPORTJSON
 {
     "node_name": "$NODE_NAME",
     "server_ip": "$SERVER_IP",
+    "cf_domain": "$CF_DOMAIN",
     "country_code": "$COUNTRY_CODE",
     "country_name": "$COUNTRY_NAME",
     "city": "$CITY",
     "isp": "$ISP",
     "vless_link": "$VLESS_LINK",
-    "hysteria_link": "$HYSTERIA_LINK",
-    "port": $MAIN_PORT,
-    "public_key": "$PUBLIC_KEY",
     "uuid": "$UUID",
-    "short_id": "$SHORT_ID",
-    "sni": "$SNI_DOMAIN",
     "xray_version": "$XRAY_VERSION",
-    "protocols": ["vless-reality"$([ "$INSTALL_HYSTERIA" == true ] && echo ',"hysteria2"')],
+    "protocols": ["vless-ws-tls"],
     "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 REPORTJSON
 )
 
-    # Send registration and capture response
-    REGISTER_RESPONSE=$(curl -sf \
+    REGISTER_RESPONSE=$(curl -sf --max-time 15 \
         -X POST "$API_URL/api/nodes/register" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $API_KEY" \
         -d "$REPORT_DATA" 2>/dev/null) || REGISTER_RESPONSE=""
 
-    HTTP_CODE=$(echo "$REGISTER_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
-
     if [[ -n "$REGISTER_RESPONSE" && "$REGISTER_RESPONSE" == *"node_id"* ]]; then
         log_ok "Node registered at central panel"
 
-        # Extract node_id from response
         NODE_ID=$(echo "$REGISTER_RESPONSE" | jq -r '.node_id // empty' 2>/dev/null) || true
 
         if [[ -n "$NODE_ID" ]]; then
-            # Save heartbeat config
             cat > "$DATA_DIR/heartbeat.conf" << HBEOF
 API_URL="$API_URL"
 API_KEY="$API_KEY"
@@ -676,49 +479,49 @@ NODE_ID="$NODE_ID"
 HBEOF
             chmod 600 "$DATA_DIR/heartbeat.conf"
 
-            # Download heartbeat script
             curl -sf "$SCRIPTS_URL/scripts/heartbeat.sh" -o "$INSTALL_DIR/heartbeat.sh" 2>/dev/null || true
             chmod +x "$INSTALL_DIR/heartbeat.sh" 2>/dev/null || true
 
-            # Setup cron: run every 5 minutes
             (crontab -l 2>/dev/null | grep -v "heartbeat.sh"; echo "*/5 * * * * $INSTALL_DIR/heartbeat.sh") | crontab -
-            log_ok "Heartbeat cron configured (every 5 min)"
+            log_ok "Heartbeat configured (every 5 min)"
         fi
     else
-        log_warn "Failed to report to panel (HTTP $HTTP_CODE). You can do it manually later."
+        log_warn "Could not report to panel. Register manually or check --api-url / --api-key"
     fi
 fi
 
 # ======================== SUMMARY ========================
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}  AUTO-VPN NODE INSTALLED SUCCESSFULLY${NC}"
+echo -e "${GREEN}${BOLD}  VPN NODE INSTALLED SUCCESSFULLY${NC}"
 echo -e "${BOLD}═══════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Node:${NC}       $NODE_NAME"
 echo -e "  ${BOLD}Server:${NC}     $SERVER_IP"
+echo -e "  ${BOLD}Domain:${NC}     $CF_DOMAIN"
 echo -e "  ${BOLD}Location:${NC}   $CITY, $COUNTRY_NAME"
 echo -e "  ${BOLD}Xray:${NC}       v$XRAY_VERSION"
+echo -e "  ${BOLD}Transport:${NC}  VLESS + WebSocket + TLS (Cloudflare CDN)"
 echo ""
-echo -e "  ${BOLD}VLESS + REALITY:${NC}"
+echo -e "  ${BOLD}VLESS Link:${NC}"
 echo -e "  ${CYAN}$VLESS_LINK${NC}"
 echo ""
-if [[ "$INSTALL_HYSTERIA" == true ]]; then
-    echo -e "  ${BOLD}Hysteria2:${NC}"
-    echo -e "  ${CYAN}$HYSTERIA_LINK${NC}"
-    echo ""
-fi
 echo -e "  ${BOLD}QR Code:${NC}"
 cat "$DATA_DIR/qr-code.txt" 2>/dev/null || echo "  (qrencode not available)"
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════════════${NC}"
-echo -e "  Keys saved to: ${YELLOW}$DATA_DIR/keys.json${NC}"
-echo -e "  Config:         ${YELLOW}$CONFIG_DIR/config.json${NC}"
-echo -e "  Logs:           ${YELLOW}/var/log/xray/${NC}"
+echo ""
+echo -e "  ${BOLD}IMPORTANT:${NC} Make sure in Cloudflare DNS:"
+echo -e "    1. A-record: ${YELLOW}$CF_DOMAIN${NC} → ${YELLOW}$SERVER_IP${NC} (Proxied / orange cloud)"
+echo -e "    2. SSL/TLS mode: ${YELLOW}Full${NC}"
+echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════════════${NC}"
+echo -e "  Keys: ${YELLOW}$DATA_DIR/keys.json${NC}"
+echo -e "  Config: ${YELLOW}$CONFIG_DIR/config.json${NC}"
+echo -e "  Logs: ${YELLOW}/var/log/xray/${NC}"
 echo ""
 echo -e "  ${BOLD}Manage:${NC}"
 echo -e "    systemctl status xray"
-echo -e "    systemctl restart xray"
+echo -e "    systemctl status nginx"
 echo -e "    journalctl -u xray -f"
 echo ""
