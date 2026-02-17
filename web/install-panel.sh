@@ -56,19 +56,25 @@ mkdir -p "$PANEL_DIR/data" "$PANEL_DIR/templates" "$PANEL_DIR/static"
 
 # Create virtual environment
 python3 -m venv "$PANEL_DIR/venv"
-"$PANEL_DIR/venv/bin/pip" install -q flask gunicorn
+"$PANEL_DIR/venv/bin/pip" install -q flask gunicorn python-telegram-bot requests
 
 # Copy app files (or download from GitHub)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ -f "$SCRIPT_DIR/app.py" ]]; then
     cp "$SCRIPT_DIR/app.py" "$PANEL_DIR/app.py"
+    cp "$SCRIPT_DIR/models.py" "$PANEL_DIR/models.py" 2>/dev/null || true
+    cp "$SCRIPT_DIR/bot.py" "$PANEL_DIR/bot.py" 2>/dev/null || true
+    cp "$SCRIPT_DIR/crypto_pay.py" "$PANEL_DIR/crypto_pay.py" 2>/dev/null || true
     cp -r "$SCRIPT_DIR/templates/"* "$PANEL_DIR/templates/" 2>/dev/null || true
     cp -r "$SCRIPT_DIR/static/"* "$PANEL_DIR/static/" 2>/dev/null || true
 else
     log_info "Downloading panel files from GitHub..."
     REPO_URL="https://raw.githubusercontent.com/ParadoxCalm/auto-vpn-system/main/web"
     curl -sf "$REPO_URL/app.py" -o "$PANEL_DIR/app.py"
+    curl -sf "$REPO_URL/models.py" -o "$PANEL_DIR/models.py"
+    curl -sf "$REPO_URL/bot.py" -o "$PANEL_DIR/bot.py"
+    curl -sf "$REPO_URL/crypto_pay.py" -o "$PANEL_DIR/crypto_pay.py"
     curl -sf "$REPO_URL/templates/index.html" -o "$PANEL_DIR/templates/index.html"
     curl -sf "$REPO_URL/templates/login.html" -o "$PANEL_DIR/templates/login.html"
     curl -sf "$REPO_URL/templates/client.html" -o "$PANEL_DIR/templates/client.html"
@@ -83,17 +89,22 @@ API_KEY=$API_KEY
 DATA_DIR=$PANEL_DIR/data
 HOST=127.0.0.1
 PORT=$PANEL_PORT
+PANEL_URL=
+TELEGRAM_BOT_TOKEN=
+CRYPTOBOT_API_TOKEN=
+CRYPTOBOT_TESTNET=false
 EOF
 chmod 600 "$PANEL_DIR/.env"
 
 log_ok "Panel application configured"
 
 # ======================== SYSTEMD ========================
-log_step "Creating systemd service"
+log_step "Creating systemd services"
 
+# Panel service
 cat > /etc/systemd/system/auto-vpn-panel.service << SERVICEEOF
 [Unit]
-Description=Auto VPN Central Panel
+Description=JetsFlare Central Panel
 After=network.target
 
 [Service]
@@ -114,12 +125,33 @@ RestartSec=5
 WantedBy=multi-user.target
 SERVICEEOF
 
+# Telegram bot service (optional — starts only if TELEGRAM_BOT_TOKEN is set)
+cat > /etc/systemd/system/jetsflare-bot.service << BOTEOF
+[Unit]
+Description=JetsFlare Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=$PANEL_DIR
+EnvironmentFile=$PANEL_DIR/.env
+ExecStart=$PANEL_DIR/venv/bin/python bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+BOTEOF
+
 chown -R www-data:www-data "$PANEL_DIR"
 systemctl daemon-reload
 systemctl enable auto-vpn-panel
 systemctl start auto-vpn-panel
 
 log_ok "Panel service started"
+log_info "Telegram bot: set TELEGRAM_BOT_TOKEN in $PANEL_DIR/.env, then: systemctl enable --now jetsflare-bot"
 
 # ======================== NGINX ========================
 log_step "Configuring Nginx"

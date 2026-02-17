@@ -1,447 +1,583 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JetsFlare — Dashboard</title>
+    <title>JetsFlare — Admin</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         :root {
-            --bg: #0a0a0f;
-            --card: #12121a;
-            --card-hover: #1a1a28;
-            --border: #2a2a3a;
-            --text: #e0e0e8;
-            --text-dim: #8888aa;
-            --accent: #6c5ce7;
-            --accent2: #00cec9;
-            --green: #00b894;
-            --red: #e74c3c;
-            --orange: #f39c12;
+            --bg: #060609; --surface: #0e0e16; --surface2: #141420;
+            --border: #1e1e32; --text: #e8e8f0; --dim: #7a7a98;
+            --accent: #7c6cf0; --accent2: #00cec9; --green: #00b894;
+            --red: #e74c3c; --orange: #f39c12; --blue: #3498db;
         }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-        body {
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
-
+        /* Header */
         .header {
-            text-align: center;
-            padding: 40px 20px 20px;
-            background: linear-gradient(135deg, #0a0a1a 0%, #151530 100%);
-            border-bottom: 1px solid var(--border);
-            position: relative;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 24px; border-bottom: 1px solid var(--border);
+            background: var(--surface);
         }
+        .header-brand { font-size: 1.15em; font-weight: 700; }
+        .header-brand span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .header-right a { color: var(--dim); font-size: 0.85em; text-decoration: none; }
+        .header-right a:hover { color: var(--text); }
 
-        .header h1 {
-            font-size: 2em;
-            font-weight: 700;
-            letter-spacing: -0.5px;
+        /* Tabs */
+        .tabs {
+            display: flex; border-bottom: 1px solid var(--border); background: var(--surface);
+            padding: 0 24px; overflow-x: auto;
         }
-
-        .header h1 span {
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .tab {
+            padding: 14px 20px; font-size: 0.85em; font-weight: 500; color: var(--dim);
+            cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;
+            white-space: nowrap; user-select: none;
         }
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-        .stats {
-            display: flex;
-            justify-content: center;
-            gap: 40px;
-            margin-top: 16px;
+        /* Content */
+        .content { max-width: 1280px; margin: 0 auto; padding: 24px; }
+        .panel { display: none; animation: fadeIn 0.2s; }
+        .panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Stats grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 18px;
         }
+        .stat-card .val { font-size: 1.8em; font-weight: 700; }
+        .stat-card .label { font-size: 0.75em; color: var(--dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .val-green { color: var(--green); } .val-orange { color: var(--orange); }
+        .val-blue { color: var(--blue); } .val-accent { color: var(--accent); }
+        .val-red { color: var(--red); }
 
-        .stat {
-            text-align: center;
+        /* Table */
+        .toolbar {
+            display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
         }
-
-        .stat-value {
-            font-size: 2em;
-            font-weight: 700;
-            color: var(--accent2);
+        .toolbar input, .toolbar select {
+            padding: 9px 14px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.85em; outline: none;
         }
+        .toolbar input:focus, .toolbar select:focus { border-color: var(--accent); }
+        .toolbar input { min-width: 200px; }
 
-        .stat-label {
-            font-size: 0.85em;
-            color: var(--text-dim);
-            margin-top: 2px;
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            text-align: left; padding: 10px 12px; font-size: 0.75em; color: var(--dim);
+            text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border);
         }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 30px 20px;
+        tbody td {
+            padding: 12px; font-size: 0.88em; border-bottom: 1px solid rgba(255,255,255,0.03);
+            vertical-align: middle;
         }
+        tbody tr:hover { background: rgba(124,108,240,0.04); }
 
-        .country-section {
-            margin-bottom: 30px;
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.7em; font-weight: 600; text-transform: uppercase; }
+        .badge-free { background: rgba(107,107,138,0.2); color: var(--dim); }
+        .badge-vip { background: rgba(243,156,18,0.15); color: var(--orange); }
+        .badge-active { background: rgba(0,184,148,0.15); color: var(--green); }
+        .badge-blocked { background: rgba(231,76,60,0.15); color: var(--red); }
+        .badge-expired { background: rgba(107,107,138,0.2); color: var(--dim); }
+        .badge-online { background: rgba(0,184,148,0.15); color: var(--green); }
+        .badge-offline { background: rgba(231,76,60,0.15); color: var(--red); }
+
+        .btn-action {
+            padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
+            background: var(--surface); color: var(--text); font-size: 0.75em;
+            cursor: pointer; font-family: inherit; transition: all 0.2s;
         }
+        .btn-action:hover { border-color: var(--accent); }
+        .btn-action.danger { border-color: rgba(231,76,60,0.3); color: var(--red); }
+        .btn-action.danger:hover { background: rgba(231,76,60,0.1); }
+        .actions-cell { display: flex; gap: 4px; flex-wrap: wrap; }
 
-        .country-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 14px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border);
+        .pagination { display: flex; gap: 8px; margin-top: 16px; justify-content: center; }
+        .pagination button {
+            padding: 8px 14px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text); cursor: pointer; font-size: 0.85em;
         }
+        .pagination button:hover { border-color: var(--accent); }
+        .pagination button:disabled { opacity: 0.3; cursor: default; }
 
-        .country-flag {
-            font-size: 1.8em;
-        }
-
-        .country-name {
-            font-size: 1.2em;
-            font-weight: 600;
-        }
-
-        .country-count {
-            color: var(--text-dim);
-            font-size: 0.9em;
-        }
-
-        .nodes-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-            gap: 16px;
-        }
-
+        /* Node cards */
+        .nodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
         .node-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.2s;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 18px; transition: border-color 0.2s;
         }
+        .node-card:hover { border-color: var(--accent); }
+        .node-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .node-name { font-weight: 600; }
+        .node-info { font-size: 0.8em; color: var(--dim); margin-bottom: 10px; }
+        .node-flag { font-size: 1.4em; margin-right: 8px; }
+        .node-actions { display: flex; gap: 6px; }
 
-        .node-card:hover {
-            background: var(--card-hover);
-            border-color: var(--accent);
-            transform: translateY(-2px);
+        /* Settings form */
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 600px; }
+        .setting-field { }
+        .setting-field label { display: block; font-size: 0.8em; color: var(--dim); margin-bottom: 6px; }
+        .setting-field input {
+            width: 100%; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.9em; outline: none;
         }
-
-        .node-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
+        .setting-field input:focus { border-color: var(--accent); }
+        .btn-save {
+            margin-top: 20px; padding: 12px 32px; background: var(--accent); border: none;
+            border-radius: 10px; color: white; font-weight: 600; cursor: pointer; font-size: 0.9em;
         }
+        .btn-save:hover { background: #6b5bd6; }
 
-        .node-name {
-            font-weight: 600;
-            font-size: 1.1em;
+        /* Modal */
+        .modal-bg {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(3px);
         }
-
-        .node-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.8em;
-            padding: 3px 10px;
-            border-radius: 20px;
+        .modal-bg.active { display: flex; }
+        .modal-box {
+            background: var(--surface2); border: 1px solid var(--border); border-radius: 14px;
+            padding: 28px; max-width: 480px; width: 90%; max-height: 80vh; overflow-y: auto;
         }
-
-        .node-status.online {
-            background: rgba(0, 184, 148, 0.15);
-            color: var(--green);
+        .modal-box h3 { margin-bottom: 16px; font-size: 1.1em; }
+        .modal-row { margin-bottom: 12px; }
+        .modal-row label { display: block; font-size: 0.8em; color: var(--dim); margin-bottom: 4px; }
+        .modal-row input, .modal-row select {
+            width: 100%; padding: 10px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text); font-family: inherit; outline: none;
         }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-actions button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .modal-actions .btn-cancel { background: rgba(255,255,255,0.05); color: var(--dim); }
+        .modal-actions .btn-confirm { background: var(--accent); color: white; }
 
-        .node-status.offline {
-            background: rgba(231, 76, 60, 0.15);
-            color: var(--red);
-        }
+        .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85em; }
+        .text-dim { color: var(--dim); }
+        .mt-4 { margin-top: 4px; } .mt-8 { margin-top: 8px; }
 
-        .node-status .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: currentColor;
-        }
+        /* Referral table */
+        .ref-table { width: 100%; }
 
-        .node-info {
-            color: var(--text-dim);
-            font-size: 0.85em;
-            margin-bottom: 14px;
-        }
-
-        .protocols {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 14px;
-        }
-
-        .protocol-tag {
-            font-size: 0.75em;
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-
-        .protocol-tag.vless {
-            background: rgba(108, 92, 231, 0.2);
-            color: var(--accent);
-        }
-
-        .protocol-tag.hysteria {
-            background: rgba(0, 206, 201, 0.2);
-            color: var(--accent2);
-        }
-
-        .key-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn {
-            flex: 1;
-            padding: 10px 16px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.85em;
-            font-weight: 600;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-
-        .btn-copy {
-            background: var(--accent);
-            color: white;
-        }
-
-        .btn-copy:hover {
-            background: #5a4bd4;
-        }
-
-        .btn-qr {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-
-        .btn-qr:hover {
-            background: rgba(255, 255, 255, 0.12);
-        }
-
-        .btn-hy2 {
-            background: rgba(0, 206, 201, 0.15);
-            color: var(--accent2);
-            border: 1px solid rgba(0, 206, 201, 0.3);
-        }
-
-        .btn-hy2:hover {
-            background: rgba(0, 206, 201, 0.25);
-        }
-
-        .copied {
-            background: var(--green) !important;
-        }
-
-        /* QR Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 30px;
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-        }
-
-        .modal h3 {
-            margin-bottom: 16px;
-        }
-
-        .modal canvas {
-            border-radius: 8px;
-            max-width: 100%;
-        }
-
-        .modal .close-btn {
-            margin-top: 16px;
-            padding: 10px 30px;
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 80px 20px;
-            color: var(--text-dim);
-        }
-
-        .empty-state h2 {
-            margin-bottom: 12px;
-            color: var(--text);
-        }
-
-        .empty-state code {
-            display: inline-block;
-            margin-top: 16px;
-            padding: 12px 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.85em;
-            word-break: break-all;
-        }
-
-        @media (max-width: 600px) {
-            .nodes-grid {
-                grid-template-columns: 1fr;
-            }
-            .stats { gap: 20px; }
-            .header h1 { font-size: 1.5em; }
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .nodes-grid { grid-template-columns: 1fr; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .content { padding: 16px; }
+            table { font-size: 0.8em; }
         }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <a href="/logout" style="position:absolute;top:16px;right:20px;color:#8888aa;font-size:0.85em;text-decoration:none;">Logout</a>
-    <h1><span>JetsFlare</span> Dashboard</h1>
-    <div class="stats">
-        <div class="stat">
-            <div class="stat-value">{{ total }}</div>
-            <div class="stat-label">Servers</div>
-        </div>
-        <div class="stat">
-            <div class="stat-value">{{ countries | length }}</div>
-            <div class="stat-label">Countries</div>
+    <div class="header-brand"><span>JetsFlare</span> Admin</div>
+    <div class="header-right">
+        <a href="/go" target="_blank">Client page</a>
+        <a href="/logout">Logout</a>
+    </div>
+</div>
+
+<div class="tabs">
+    <div class="tab active" data-panel="dashboard">Dashboard</div>
+    <div class="tab" data-panel="users">Users</div>
+    <div class="tab" data-panel="nodes">Nodes</div>
+    <div class="tab" data-panel="referrals">Referrals</div>
+    <div class="tab" data-panel="settings">Settings</div>
+</div>
+
+<div class="content">
+
+<!-- DASHBOARD -->
+<div class="panel active" id="panelDashboard">
+    <div class="stats-grid" id="dashStats">
+        <div class="stat-card"><div class="val val-accent" id="sTotal">--</div><div class="label">Total users</div></div>
+        <div class="stat-card"><div class="val val-green" id="sActive">--</div><div class="label">Active</div></div>
+        <div class="stat-card"><div class="val val-orange" id="sVip">--</div><div class="label">VIP</div></div>
+        <div class="stat-card"><div class="val" id="sFree">--</div><div class="label">Free</div></div>
+        <div class="stat-card"><div class="val val-red" id="sBlocked">--</div><div class="label">Blocked</div></div>
+        <div class="stat-card"><div class="val val-blue" id="sNodes">--</div><div class="label">Nodes online</div></div>
+        <div class="stat-card"><div class="val val-green" id="sRevenue">--</div><div class="label">Revenue (30d)</div></div>
+        <div class="stat-card"><div class="val" id="sRevenueTotal">--</div><div class="label">Revenue total</div></div>
+    </div>
+</div>
+
+<!-- USERS -->
+<div class="panel" id="panelUsers">
+    <div class="toolbar">
+        <input type="text" id="userSearch" placeholder="Search by name, code, UUID..." oninput="debounceLoadUsers()">
+        <select id="userFilterTier" onchange="loadUsers()">
+            <option value="">All tiers</option>
+            <option value="free">Free</option>
+            <option value="vip">VIP</option>
+        </select>
+        <select id="userFilterStatus" onchange="loadUsers()">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="blocked">Blocked</option>
+            <option value="expired">Expired</option>
+        </select>
+    </div>
+    <div style="overflow-x:auto">
+    <table>
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Tier</th>
+                <th>Status</th>
+                <th>Expires</th>
+                <th>Traffic</th>
+                <th>Devices</th>
+                <th>Refs</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="usersBody"></tbody>
+    </table>
+    </div>
+    <div class="pagination" id="usersPagination"></div>
+</div>
+
+<!-- NODES -->
+<div class="panel" id="panelNodes">
+    <div class="nodes-grid" id="nodesGrid">
+        <div style="color:var(--dim);text-align:center;padding:40px">Loading nodes...</div>
+    </div>
+</div>
+
+<!-- REFERRALS -->
+<div class="panel" id="panelReferrals">
+    <table class="ref-table">
+        <thead><tr><th>User</th><th>Code</th><th>Referrals</th><th>Bonus days</th></tr></thead>
+        <tbody id="referralsBody"></tbody>
+    </table>
+</div>
+
+<!-- SETTINGS -->
+<div class="panel" id="panelSettings">
+    <h3 style="margin-bottom:20px;font-size:1.1em">System Settings</h3>
+    <div class="settings-grid" id="settingsForm"></div>
+    <button class="btn-save" onclick="saveSettings()">Save Settings</button>
+    <div id="settingsMsg" style="margin-top:10px;font-size:0.85em;color:var(--green);display:none">Saved!</div>
+</div>
+
+</div>
+
+<!-- User Detail Modal -->
+<div class="modal-bg" id="userModal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="modal-box">
+        <h3 id="modalTitle">User Details</h3>
+        <div id="modalContent"></div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="document.getElementById('userModal').classList.remove('active')">Close</button>
         </div>
     </div>
 </div>
 
-<div class="container">
-    {% if nodes %}
-        {% for cc, country in countries.items() | sort %}
-        <div class="country-section">
-            <div class="country-header">
-                <span class="country-flag">{{ country.flag }}</span>
-                <span class="country-name">{{ country.name }}</span>
-                <span class="country-count">{{ country.nodes | length }} server{{ 's' if country.nodes | length > 1 else '' }}</span>
-            </div>
-            <div class="nodes-grid">
-                {% for node in country.nodes %}
-                <div class="node-card">
-                    <div class="node-top">
-                        <span class="node-name">{{ node.node_name }}</span>
-                        <span class="node-status {{ node.get('status', 'online') }}">
-                            <span class="dot"></span>
-                            {{ node.get('status', 'online') }}
-                        </span>
-                    </div>
-                    <div class="node-info">
-                        {{ node.get('city', '') }}{% if node.get('isp') %} &middot; {{ node.isp }}{% endif %}
-                    </div>
-                    <div class="protocols">
-                        {% for proto in node.get('protocols', ['vless-reality']) %}
-                        <span class="protocol-tag {{ 'hysteria' if 'hysteria' in proto else 'vless' }}">{{ proto }}</span>
-                        {% endfor %}
-                    </div>
-                    <div class="key-actions">
-                        <button class="btn btn-copy" onclick="copyKey(this, '{{ node.vless_link }}')">
-                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                            VLESS
-                        </button>
-                        {% if node.get('hysteria_link') %}
-                        <button class="btn btn-hy2" onclick="copyKey(this, '{{ node.hysteria_link }}')">
-                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                            HY2
-                        </button>
-                        {% endif %}
-                        <button class="btn btn-qr" onclick="showQR('{{ node.node_name }}', '{{ node.vless_link }}')">
-                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M3 11V3h8v8H3zm2-6v4h4V5H5zm8-2v8h8V3h-8zm6 6h-4V5h4v4zM3 21v-8h8v8H3zm2-6v4h4v-4H5zm8 0h2v2h-2v-2zm0 4h2v2h-2v-2zm4-4h2v2h-2v-2zm0 4h2v2h-2v-2z"/></svg>
-                            QR
-                        </button>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="empty-state">
-            <h2>No servers yet</h2>
-            <p>Run the install script on your servers to add them here:</p>
-            <code>bash install.sh --api-url https://your-panel.com --api-key YOUR_KEY</code>
-        </div>
-    {% endif %}
-</div>
-
-<!-- QR Modal -->
-<div class="modal-overlay" id="qrModal" onclick="closeQR(event)">
-    <div class="modal">
-        <h3 id="qrTitle"></h3>
-        <div id="qrCanvas"></div>
-        <br>
-        <button class="close-btn" onclick="document.getElementById('qrModal').classList.remove('active')">Close</button>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
-function copyKey(btn, link) {
-    navigator.clipboard.writeText(link).then(() => {
-        const orig = btn.innerHTML;
-        btn.classList.add('copied');
-        btn.textContent = 'Copied!';
-        setTimeout(() => {
-            btn.innerHTML = orig;
-            btn.classList.remove('copied');
-        }, 1500);
+// ============== Tab switching ==============
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('panel' + capitalize(tab.dataset.panel)).classList.add('active');
+        // Load data for the tab
+        const p = tab.dataset.panel;
+        if (p === 'dashboard') loadDashboard();
+        else if (p === 'users') loadUsers();
+        else if (p === 'nodes') loadNodes();
+        else if (p === 'referrals') loadReferrals();
+        else if (p === 'settings') loadSettings();
     });
+});
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ============== API helper ==============
+async function api(path, opts = {}) {
+    const resp = await fetch(path, {
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        ...opts,
+    });
+    if (resp.status === 401) { window.location.href = '/login'; return null; }
+    return resp.json();
 }
 
-function showQR(name, link) {
-    document.getElementById('qrTitle').textContent = name;
-    const container = document.getElementById('qrCanvas');
-    container.innerHTML = '';
-    new QRCode(container, {
-        text: link,
-        width: 280,
-        height: 280,
-        colorDark: '#e0e0e8',
-        colorLight: '#12121a',
-        correctLevel: QRCode.CorrectLevel.M
-    });
-    document.getElementById('qrModal').classList.add('active');
+// ============== Dashboard ==============
+async function loadDashboard() {
+    const s = await api('/api/admin/stats');
+    if (!s) return;
+    document.getElementById('sTotal').textContent = s.total_users;
+    document.getElementById('sActive').textContent = s.active_users;
+    document.getElementById('sVip').textContent = s.vip_users;
+    document.getElementById('sFree').textContent = s.free_users;
+    document.getElementById('sBlocked').textContent = s.blocked_users;
+    document.getElementById('sNodes').textContent = s.nodes_online + ' / ' + s.nodes_total;
+    document.getElementById('sRevenue').textContent = '$' + Number(s.revenue_30d).toFixed(2);
+    document.getElementById('sRevenueTotal').textContent = '$' + Number(s.revenue_total).toFixed(2);
 }
 
-function closeQR(e) {
-    if (e.target === e.currentTarget) {
-        e.target.classList.remove('active');
+// ============== Users ==============
+let usersPage = 0;
+const PAGE_SIZE = 30;
+let debounceTimer;
+
+function debounceLoadUsers() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => { usersPage = 0; loadUsers(); }, 300);
+}
+
+async function loadUsers() {
+    const search = document.getElementById('userSearch').value;
+    const tier = document.getElementById('userFilterTier').value;
+    const status = document.getElementById('userFilterStatus').value;
+
+    const params = new URLSearchParams({ limit: PAGE_SIZE, offset: usersPage * PAGE_SIZE });
+    if (search) params.set('search', search);
+    if (tier) params.set('tier', tier);
+    if (status) params.set('status', status);
+
+    const data = await api('/api/admin/users?' + params);
+    if (!data) return;
+
+    const body = document.getElementById('usersBody');
+    if (data.users.length === 0) {
+        body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:40px">No users found</td></tr>';
+        document.getElementById('usersPagination').innerHTML = '';
+        return;
+    }
+
+    body.innerHTML = data.users.map(u => {
+        const days = u.subscription_expires_at
+            ? Math.max(0, Math.ceil((new Date(u.subscription_expires_at) - new Date()) / 86400000))
+            : '--';
+        const trafficMB = Math.round((u.traffic_today || 0) / 1024 / 1024);
+        return `<tr>
+            <td>
+                <div style="font-weight:600">${esc(u.nickname)}</div>
+                <div class="mono text-dim mt-4">${u.referral_code}</div>
+            </td>
+            <td><span class="badge badge-${u.tier}">${u.tier}</span></td>
+            <td><span class="badge badge-${u.status}">${u.status}</span></td>
+            <td>${days} days</td>
+            <td>${trafficMB} MB</td>
+            <td>${u.device_limit}</td>
+            <td>${u.referral_count || 0}</td>
+            <td class="actions-cell">
+                <button class="btn-action" onclick="editUser(${u.id})">Edit</button>
+                <button class="btn-action" onclick="toggleBlock(${u.id}, '${u.status}')">${u.status === 'blocked' ? 'Unblock' : 'Block'}</button>
+                <button class="btn-action danger" onclick="deleteUser(${u.id}, '${esc(u.nickname)}')">Del</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    // Pagination
+    const totalPages = Math.ceil(data.total / PAGE_SIZE);
+    const pag = document.getElementById('usersPagination');
+    pag.innerHTML = '';
+    if (totalPages > 1) {
+        const prev = document.createElement('button');
+        prev.textContent = 'Prev';
+        prev.disabled = usersPage === 0;
+        prev.onclick = () => { usersPage--; loadUsers(); };
+        pag.appendChild(prev);
+
+        const info = document.createElement('span');
+        info.style.cssText = 'padding:8px;color:var(--dim);font-size:0.85em';
+        info.textContent = `${usersPage + 1} / ${totalPages}`;
+        pag.appendChild(info);
+
+        const next = document.createElement('button');
+        next.textContent = 'Next';
+        next.disabled = usersPage >= totalPages - 1;
+        next.onclick = () => { usersPage++; loadUsers(); };
+        pag.appendChild(next);
     }
 }
+
+async function editUser(id) {
+    const u = await api('/api/admin/users/' + id);
+    if (!u) return;
+
+    const days = u.subscription_expires_at
+        ? Math.max(0, Math.ceil((new Date(u.subscription_expires_at) - new Date()) / 86400000))
+        : 0;
+    const trafficMB = Math.round((u.traffic_today || 0) / 1024 / 1024);
+
+    document.getElementById('modalTitle').textContent = u.nickname;
+    document.getElementById('modalContent').innerHTML = `
+        <div class="modal-row">
+            <label>UUID</label>
+            <input value="${u.uuid}" readonly class="mono" onclick="this.select()">
+        </div>
+        <div class="modal-row">
+            <label>Access Code</label>
+            <input value="${u.referral_code}" readonly class="mono" onclick="this.select()">
+        </div>
+        <div class="modal-row">
+            <label>Tier</label>
+            <select id="editTier"><option value="free" ${u.tier==='free'?'selected':''}>Free</option><option value="vip" ${u.tier==='vip'?'selected':''}>VIP</option></select>
+        </div>
+        <div class="modal-row">
+            <label>Device Limit</label>
+            <input type="number" id="editDevices" value="${u.device_limit}" min="1" max="20">
+        </div>
+        <div class="modal-row">
+            <label>Extend Subscription (days)</label>
+            <input type="number" id="editExtend" value="0" min="0" max="365">
+        </div>
+        <div class="modal-row">
+            <label>Status: <span class="badge badge-${u.status}">${u.status}</span> | Days left: ${days} | Traffic today: ${trafficMB} MB | Referrals: ${u.referral_count || 0}</label>
+        </div>
+        <div class="modal-actions" style="margin-top:16px">
+            <button class="btn-cancel" onclick="document.getElementById('userModal').classList.remove('active')">Cancel</button>
+            <button class="btn-confirm" onclick="saveUserEdit(${u.id})">Save Changes</button>
+        </div>
+    `;
+    document.getElementById('userModal').classList.add('active');
+}
+
+async function saveUserEdit(id) {
+    const tier = document.getElementById('editTier').value;
+    const devices = parseInt(document.getElementById('editDevices').value);
+    const extend = parseInt(document.getElementById('editExtend').value);
+
+    await api('/api/admin/users/' + id + '/tier', { method: 'POST', body: JSON.stringify({ tier }) });
+    await api('/api/admin/users/' + id + '/device-limit', { method: 'POST', body: JSON.stringify({ limit: devices }) });
+    if (extend > 0) {
+        await api('/api/admin/users/' + id + '/extend', { method: 'POST', body: JSON.stringify({ days: extend }) });
+    }
+
+    document.getElementById('userModal').classList.remove('active');
+    loadUsers();
+}
+
+async function toggleBlock(id, currentStatus) {
+    const newStatus = currentStatus === 'blocked' ? 'active' : 'blocked';
+    await api('/api/admin/users/' + id + '/block', { method: 'POST', body: JSON.stringify({ status: newStatus }) });
+    loadUsers();
+}
+
+async function deleteUser(id, name) {
+    if (!confirm('Delete user "' + name + '"? This cannot be undone.')) return;
+    await api('/api/admin/users/' + id, { method: 'DELETE' });
+    loadUsers();
+}
+
+// ============== Nodes ==============
+function flag(cc) {
+    if (!cc || cc.length !== 2) return '';
+    return String.fromCodePoint(0x1F1E6 + cc.toUpperCase().charCodeAt(0) - 65, 0x1F1E6 + cc.toUpperCase().charCodeAt(1) - 65);
+}
+
+async function loadNodes() {
+    const nodes = await api('/api/admin/nodes');
+    if (!nodes) return;
+    const grid = document.getElementById('nodesGrid');
+
+    if (nodes.length === 0) {
+        grid.innerHTML = '<div style="color:var(--dim);text-align:center;padding:60px">No nodes registered yet</div>';
+        return;
+    }
+
+    grid.innerHTML = nodes.map(n => `
+        <div class="node-card">
+            <div class="node-top">
+                <div>
+                    <span class="node-flag">${flag(n.country_code)}</span>
+                    <span class="node-name">${esc(n.node_name)}</span>
+                </div>
+                <span class="badge badge-${n.status || 'online'}">${n.status || 'online'}</span>
+            </div>
+            <div class="node-info">
+                ${esc(n.city || '')}${n.isp ? ' &middot; ' + esc(n.isp) : ''}<br>
+                ${n.cf_domain ? esc(n.cf_domain) : esc(n.server_ip)}
+                ${n.xray_version ? ' &middot; Xray ' + esc(n.xray_version) : ''}
+            </div>
+            <div class="node-actions">
+                ${n.vless_link ? '<button class="btn-action" onclick="copyText(\'' + escAttr(n.vless_link) + '\')">Copy Link</button>' : ''}
+                <button class="btn-action danger" onclick="deleteNode(\'${n.id}\', \'${esc(n.node_name)}\')">Delete</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function deleteNode(id, name) {
+    if (!confirm('Delete node "' + name + '"?')) return;
+    await api('/api/admin/nodes/' + id, { method: 'DELETE' });
+    loadNodes();
+}
+
+// ============== Referrals ==============
+async function loadReferrals() {
+    const data = await api('/api/admin/referrals');
+    if (!data) return;
+    const body = document.getElementById('referralsBody');
+    if (data.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:40px">No referrals yet</td></tr>';
+        return;
+    }
+    body.innerHTML = data.map(r => `
+        <tr>
+            <td style="font-weight:600">${esc(r.nickname)}</td>
+            <td class="mono">${r.referral_code}</td>
+            <td>${r.ref_count}</td>
+            <td>${r.total_bonus} days</td>
+        </tr>
+    `).join('');
+}
+
+// ============== Settings ==============
+const SETTING_LABELS = {
+    trial_days: 'Trial days (new users)',
+    referral_bonus_days: 'Referral bonus days',
+    free_daily_traffic_mb: 'Free daily traffic (MB)',
+    free_device_limit: 'Free device limit',
+    vip_device_limit: 'VIP device limit',
+    vip_price_usdt: 'VIP price (USDT)',
+    vip_duration_days: 'VIP duration (days)',
+    brand_name: 'Brand name',
+};
+
+async function loadSettings() {
+    const data = await api('/api/admin/settings');
+    if (!data) return;
+    const form = document.getElementById('settingsForm');
+    form.innerHTML = Object.entries(SETTING_LABELS).map(([key, label]) => `
+        <div class="setting-field">
+            <label>${label}</label>
+            <input type="text" data-key="${key}" value="${esc(data[key] || '')}">
+        </div>
+    `).join('');
+    document.getElementById('settingsMsg').style.display = 'none';
+}
+
+async function saveSettings() {
+    const inputs = document.querySelectorAll('#settingsForm input[data-key]');
+    const data = {};
+    inputs.forEach(inp => { data[inp.dataset.key] = inp.value; });
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify(data) });
+    const msg = document.getElementById('settingsMsg');
+    msg.style.display = 'block';
+    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+}
+
+// ============== Helpers ==============
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+function copyText(text) {
+    navigator.clipboard.writeText(text).catch(() => prompt('Copy:', text));
+}
+
+// ============== Init ==============
+loadDashboard();
 </script>
 
 </body>

@@ -222,7 +222,32 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
         "access": "/var/log/xray/access.log",
         "error": "/var/log/xray/error.log"
     },
+    "stats": {},
+    "api": {
+        "tag": "api",
+        "listen": "127.0.0.1:10085",
+        "services": ["HandlerService", "StatsService"]
+    },
+    "policy": {
+        "levels": {
+            "0": {
+                "statsUserUplink": true,
+                "statsUserDownlink": true
+            }
+        },
+        "system": {
+            "statsInboundUplink": true,
+            "statsInboundDownlink": true
+        }
+    },
     "inbounds": [
+        {
+            "tag": "api-in",
+            "listen": "127.0.0.1",
+            "port": 10085,
+            "protocol": "dokodemo-door",
+            "settings": {"address": "127.0.0.1"}
+        },
         {
             "tag": "vless-ws",
             "listen": "127.0.0.1",
@@ -232,7 +257,8 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
                 "clients": [
                     {
                         "id": "$UUID",
-                        "email": "default@$NODE_NAME"
+                        "email": "default@panel",
+                        "level": 0
                     }
                 ],
                 "decryption": "none"
@@ -256,6 +282,7 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
     "routing": {
         "domainStrategy": "IPIfNonMatch",
         "rules": [
+            {"type": "field", "inboundTag": ["api-in"], "outboundTag": "api"},
             {"type": "field", "outboundTag": "block", "protocol": ["bittorrent"]},
             {"type": "field", "outboundTag": "block", "ip": ["geoip:private"]}
         ]
@@ -414,6 +441,7 @@ log_ok "Log rotation configured"
 log_step "Generating client configuration"
 
 VLESS_LINK="vless://${UUID}@${CF_DOMAIN}:443?encryption=none&security=tls&sni=${CF_DOMAIN}&fp=chrome&type=ws&path=%2Fws&host=${CF_DOMAIN}#${NODE_NAME}"
+VLESS_TEMPLATE="vless://{uuid}@${CF_DOMAIN}:443?encryption=none&security=tls&sni=${CF_DOMAIN}&fp=chrome&type=ws&path=%2Fws&host=${CF_DOMAIN}#{node_name}"
 
 echo "$VLESS_LINK" > "$DATA_DIR/vless-link.txt"
 
@@ -452,7 +480,9 @@ if [[ "$NO_REPORT" == false && -n "$API_URL" && -n "$API_KEY" ]]; then
     "city": "$CITY",
     "isp": "$ISP",
     "vless_link": "$VLESS_LINK",
+    "vless_link_template": "$VLESS_TEMPLATE",
     "uuid": "$UUID",
+    "ws_path": "$WS_PATH",
     "xray_version": "$XRAY_VERSION",
     "protocols": ["vless-ws-tls"],
     "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -480,10 +510,11 @@ HBEOF
             chmod 600 "$DATA_DIR/heartbeat.conf"
 
             curl -sf "$SCRIPTS_URL/scripts/heartbeat.sh" -o "$INSTALL_DIR/heartbeat.sh" 2>/dev/null || true
-            chmod +x "$INSTALL_DIR/heartbeat.sh" 2>/dev/null || true
+            curl -sf "$SCRIPTS_URL/scripts/sync-clients.sh" -o "$INSTALL_DIR/sync-clients.sh" 2>/dev/null || true
+            chmod +x "$INSTALL_DIR/heartbeat.sh" "$INSTALL_DIR/sync-clients.sh" 2>/dev/null || true
 
             (crontab -l 2>/dev/null | grep -v "heartbeat.sh"; echo "*/5 * * * * $INSTALL_DIR/heartbeat.sh") | crontab -
-            log_ok "Heartbeat configured (every 5 min)"
+            log_ok "Heartbeat + client sync configured (every 5 min)"
         fi
     else
         log_warn "Could not report to panel. Register manually or check --api-url / --api-key"

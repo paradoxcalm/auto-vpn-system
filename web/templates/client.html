@@ -8,185 +8,192 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         :root {
             --bg: #050508;
             --surface: #0d0d14;
+            --surface2: #13131e;
             --border: #1a1a2e;
             --text: #f0f0f5;
             --dim: #6b6b8a;
             --accent: #7c6cf0;
+            --accent2: #00cec9;
+            --green: #00b894;
+            --red: #e74c3c;
+            --orange: #f39c12;
             --glow: rgba(124, 108, 240, 0.15);
         }
-
         body {
             font-family: 'Inter', -apple-system, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
         }
-
-        /* Animated background */
         .bg-orb {
-            position: fixed;
-            border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.3;
-            animation: float 20s ease-in-out infinite;
-            pointer-events: none;
+            position: fixed; border-radius: 50%; filter: blur(80px);
+            opacity: 0.25; animation: float 20s ease-in-out infinite; pointer-events: none;
         }
-        .bg-orb:nth-child(1) {
-            width: 400px; height: 400px;
-            background: #7c6cf0;
-            top: -100px; left: -100px;
-        }
-        .bg-orb:nth-child(2) {
-            width: 300px; height: 300px;
-            background: #00cec9;
-            bottom: -80px; right: -80px;
-            animation-delay: -10s;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0); }
-            50% { transform: translate(30px, 20px); }
-        }
+        .bg-orb:nth-child(1) { width: 400px; height: 400px; background: #7c6cf0; top: -100px; left: -100px; }
+        .bg-orb:nth-child(2) { width: 300px; height: 300px; background: #00cec9; bottom: -80px; right: -80px; animation-delay: -10s; }
+        @keyframes float { 0%,100% { transform: translate(0,0); } 50% { transform: translate(30px,20px); } }
 
         .container {
-            position: relative;
-            z-index: 1;
-            text-align: center;
-            padding: 40px 24px;
-            max-width: 420px;
-            width: 100%;
+            position: relative; z-index: 1;
+            max-width: 460px; margin: 0 auto; padding: 40px 20px;
+            min-height: 100dvh; display: flex; flex-direction: column;
         }
-
-        .logo {
-            font-size: 3.5em;
-            margin-bottom: 8px;
-            line-height: 1;
-        }
-
+        .logo { font-size: 3em; text-align: center; line-height: 1; }
         .brand {
-            font-size: 1.8em;
-            font-weight: 700;
-            letter-spacing: -1px;
-            margin-bottom: 6px;
+            font-size: 1.6em; font-weight: 700; letter-spacing: -1px; text-align: center;
+            margin-bottom: 4px;
             background: linear-gradient(135deg, #f0f0f5 0%, #a8a8c8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
+        .tagline { color: var(--dim); font-size: 0.85em; text-align: center; margin-bottom: 32px; }
 
-        .tagline {
-            color: var(--dim);
-            font-size: 0.9em;
-            font-weight: 300;
-            margin-bottom: 48px;
-            letter-spacing: 0.5px;
-        }
+        /* Screens */
+        .screen { display: none; animation: fadeIn 0.3s ease; }
+        .screen.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
+        /* Forms */
+        .input-group { margin-bottom: 16px; }
+        .input-group label { display: block; font-size: 0.8em; color: var(--dim); margin-bottom: 6px; font-weight: 500; }
+        .input-group input {
+            width: 100%; padding: 14px 16px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; color: var(--text); font-size: 1em;
+            font-family: inherit; outline: none; transition: border-color 0.2s;
         }
+        .input-group input:focus { border-color: var(--accent); }
+        .input-group input::placeholder { color: #3a3a55; }
 
         .btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            padding: 18px 32px;
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            background: var(--surface);
-            color: var(--text);
-            font-size: 1.05em;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            text-decoration: none;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            width: 100%; padding: 16px; border-radius: 14px;
+            border: 1px solid var(--border); background: var(--surface);
+            color: var(--text); font-size: 1em; font-weight: 600;
+            font-family: inherit; cursor: pointer; transition: all 0.25s;
+            text-decoration: none; -webkit-tap-highlight-color: transparent;
+        }
+        .btn:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: 0 6px 24px var(--glow); }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--accent); border-color: var(--accent); }
+        .btn-primary:hover { background: #6b5bd6; }
+        .btn-sm { padding: 10px 16px; font-size: 0.85em; border-radius: 10px; }
+        .btn-outline { background: transparent; }
+        .btn-green { background: rgba(0,184,148,0.15); border-color: rgba(0,184,148,0.3); color: var(--green); }
+
+        .link-btn { color: var(--accent); background: none; border: none; font-size: 0.85em; cursor: pointer; font-family: inherit; padding: 8px 0; }
+
+        /* Cards */
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; padding: 18px; margin-bottom: 12px;
         }
 
-        .btn:hover {
-            border-color: var(--accent);
-            background: linear-gradient(135deg, var(--surface) 0%, rgba(124, 108, 240, 0.08) 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px var(--glow);
+        /* Status bar */
+        .status-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
+        }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 14px; text-align: center;
+        }
+        .stat-val { font-size: 1.3em; font-weight: 700; }
+        .stat-label { font-size: 0.7em; color: var(--dim); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-val.green { color: var(--green); }
+        .stat-val.orange { color: var(--orange); }
+        .stat-val.red { color: var(--red); }
+
+        /* Tier badge */
+        .badge {
+            display: inline-block; padding: 3px 10px; border-radius: 20px;
+            font-size: 0.7em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .badge-free { background: rgba(107,107,138,0.2); color: var(--dim); }
+        .badge-vip { background: rgba(243,156,18,0.15); color: var(--orange); }
+
+        /* Server list */
+        .server-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .server-item:last-child { border-bottom: none; }
+        .server-info { display: flex; align-items: center; gap: 12px; }
+        .server-flag { font-size: 1.5em; }
+        .server-name { font-weight: 600; font-size: 0.95em; }
+        .server-city { font-size: 0.75em; color: var(--dim); }
+        .server-actions { display: flex; gap: 6px; }
+        .btn-icon {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            color: var(--text); cursor: pointer; display: flex; align-items: center;
+            justify-content: center; transition: all 0.2s;
+        }
+        .btn-icon:hover { border-color: var(--accent); background: rgba(124,108,240,0.1); }
+        .btn-icon.copied { background: rgba(0,184,148,0.2); border-color: var(--green); }
+
+        /* Referral section */
+        .ref-box {
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center;
+        }
+        .ref-box h4 { font-size: 0.85em; margin-bottom: 8px; }
+        .ref-link {
+            font-family: 'SF Mono', monospace; font-size: 0.8em;
+            color: var(--accent); word-break: break-all; margin-bottom: 10px;
         }
 
-        .btn:active {
-            transform: scale(0.98);
+        /* Access code display */
+        .code-display {
+            font-family: 'SF Mono', monospace; font-size: 1.8em; font-weight: 700;
+            letter-spacing: 4px; text-align: center; padding: 20px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; margin: 16px 0; color: var(--accent);
         }
 
-        .btn svg {
-            width: 24px;
-            height: 24px;
-            flex-shrink: 0;
+        /* Section titles */
+        .section-title {
+            font-size: 0.75em; color: var(--dim); text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 12px; margin-top: 24px;
         }
 
-        .btn-apple svg { fill: var(--text); }
-        .btn-android svg { fill: #3ddc84; }
-
-        /* Success state */
-        .btn.copied {
-            border-color: #00b894;
-            background: rgba(0, 184, 148, 0.1);
-        }
-
-        .btn.copied .btn-text::after {
-            content: ' — Copied!';
-            color: #00b894;
-        }
-
-        /* Toast notification */
+        /* Toast */
         .toast {
-            position: fixed;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px 24px;
-            font-size: 0.85em;
-            color: var(--dim);
-            opacity: 0;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 100;
-            white-space: nowrap;
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px 24px; font-size: 0.85em;
+            color: var(--dim); opacity: 0; transition: all 0.3s; z-index: 100; white-space: nowrap;
         }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
+        /* QR Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px);
         }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 30px; text-align: center; max-width: 360px; width: 90%;
+        }
+        .modal h3 { margin-bottom: 16px; font-size: 1em; }
 
-        .footer {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            text-align: center;
-            padding: 16px;
-            color: var(--dim);
-            font-size: 0.7em;
-            opacity: 0.5;
-        }
+        .spacer { flex: 1; }
+        .footer { text-align: center; padding: 20px; color: var(--dim); font-size: 0.65em; opacity: 0.5; }
 
-        /* Hide on desktop — show instruction */
-        @media (min-width: 768px) {
-            .tagline { margin-bottom: 32px; }
+        /* VIP promo */
+        .vip-promo {
+            background: linear-gradient(135deg, rgba(243,156,18,0.08), rgba(124,108,240,0.08));
+            border: 1px solid rgba(243,156,18,0.2); border-radius: 14px;
+            padding: 18px; margin-top: 20px; text-align: center;
         }
+        .vip-promo h4 { color: var(--orange); font-size: 0.95em; margin-bottom: 6px; }
+        .vip-promo p { color: var(--dim); font-size: 0.8em; margin-bottom: 12px; }
+
+        /* Error */
+        .error-msg { color: var(--red); font-size: 0.85em; text-align: center; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -199,73 +206,394 @@
     <div class="brand">JetsFlare</div>
     <p class="tagline">Fast. Private. Everywhere.</p>
 
-    <div class="buttons">
-        <button class="btn btn-apple" onclick="connect('ios')">
-            <svg viewBox="0 0 24 24"><path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 16.97 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/></svg>
-            <span class="btn-text">iPhone / iPad</span>
+    <!-- SCREEN: Landing -->
+    <div class="screen active" id="screenLanding">
+        <button class="btn btn-primary" onclick="showScreen('screenRegister')" style="margin-bottom:12px">
+            Get Started
         </button>
-
-        <button class="btn btn-android" onclick="connect('android')">
-            <svg viewBox="0 0 24 24"><path d="M17.6 11.48V11.47C17.6 8.86 15.33 6.7 12 6.7C8.67 6.7 6.4 8.86 6.4 11.47V11.48C4.97 11.65 3.85 12.87 3.85 14.36C3.85 15.95 5.12 17.22 6.71 17.22H17.29C18.88 17.22 20.15 15.95 20.15 14.36C20.15 12.87 19.03 11.65 17.6 11.48ZM7.22 3.21L6.09 2.08C8.95.72 11.97.5 15 1.78L13.91 2.87C12.35 2.32 10.56 2.24 7.22 3.21ZM16.78 3.21C13.44 2.24 11.65 2.32 10.09 2.87L9 1.78C12.03.5 15.05.72 17.91 2.08L16.78 3.21Z" fill="#3ddc84"/><path d="M6.4 11.47C6.4 8.86 8.67 6.7 12 6.7C15.33 6.7 17.6 8.86 17.6 11.47" fill="none"/></svg>
-            <span class="btn-text">Android</span>
+        <button class="btn btn-outline" onclick="showScreen('screenLogin')">
+            I have an access code
         </button>
     </div>
+
+    <!-- SCREEN: Register -->
+    <div class="screen" id="screenRegister">
+        <div class="input-group">
+            <label>Choose a nickname</label>
+            <input type="text" id="regNickname" placeholder="Your name" maxlength="30" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <label>Referral code (optional)</label>
+            <input type="text" id="regReferral" placeholder="e.g. a3f7bc12" maxlength="8" autocomplete="off">
+        </div>
+        <div id="regError" class="error-msg" style="display:none"></div>
+        <button class="btn btn-primary" onclick="register()" id="regBtn">
+            Create Account
+        </button>
+        <button class="link-btn" onclick="showScreen('screenLanding')" style="display:block;margin:12px auto 0;text-align:center">Back</button>
+    </div>
+
+    <!-- SCREEN: Login with code -->
+    <div class="screen" id="screenLogin">
+        <div class="input-group">
+            <label>Your access code</label>
+            <input type="text" id="loginCode" placeholder="e.g. a3f7bc12" maxlength="8" autocomplete="off">
+        </div>
+        <div id="loginError" class="error-msg" style="display:none"></div>
+        <button class="btn btn-primary" onclick="checkStatus()" id="loginBtn">
+            Check Status
+        </button>
+        <button class="link-btn" onclick="showScreen('screenLanding')" style="display:block;margin:12px auto 0;text-align:center">Back</button>
+    </div>
+
+    <!-- SCREEN: Dashboard (logged in user) -->
+    <div class="screen" id="screenDashboard">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div>
+                <span style="font-weight:600" id="dashNickname"></span>
+                <span class="badge badge-free" id="dashBadge"></span>
+            </div>
+            <button class="link-btn" onclick="doLogout()" style="font-size:0.75em">Logout</button>
+        </div>
+
+        <div class="status-grid">
+            <div class="stat-card">
+                <div class="stat-val green" id="dashDays">--</div>
+                <div class="stat-label">Days left</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val" id="dashTraffic">--</div>
+                <div class="stat-label">Traffic today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val" id="dashDevices">--</div>
+                <div class="stat-label">Devices</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val" id="dashReferrals">--</div>
+                <div class="stat-label">Referrals</div>
+            </div>
+        </div>
+
+        <div class="section-title">Your access code — save it!</div>
+        <div class="code-display" id="dashCode" onclick="copyText(this.textContent.trim())"></div>
+
+        <div class="section-title">Connection profiles</div>
+        <div class="card" id="serverList">
+            <div style="color:var(--dim);text-align:center;padding:20px;font-size:0.9em">Loading servers...</div>
+        </div>
+
+        <div class="section-title">Get the app</div>
+        <div style="display:flex;gap:10px">
+            <a href="https://apps.apple.com/app/streisand/id6450534064" class="btn btn-sm btn-outline" style="flex:1" target="_blank">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 16.97 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/></svg>
+                iPhone
+            </a>
+            <a href="https://play.google.com/store/apps/details?id=com.v2ray.ang" class="btn btn-sm btn-outline" style="flex:1" target="_blank">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#3ddc84"><path d="M3 20.5v-17c0-.83.52-1.28 1-1.5l10 9-10 9c-.48-.2-1-.67-1-1.5zm15-5.5l-3-2.5 3-2.5 3.5 2.5-3.5 2.5zM5 2l10 8.5-3 2.5L5 6.5V2zm0 20v-4.5l7-6.5 3 2.5L5 22z"/></svg>
+                Android
+            </a>
+        </div>
+
+        <!-- Referral -->
+        <div class="ref-box">
+            <h4>Share & get +5 free days</h4>
+            <div class="ref-link" id="dashRefLink"></div>
+            <button class="btn btn-sm btn-green" onclick="copyRefLink()">Copy referral link</button>
+        </div>
+
+        <!-- VIP promo (for free users) -->
+        <div class="vip-promo" id="vipPromo">
+            <h4>Upgrade to VIP</h4>
+            <p>Unlimited traffic, more devices, full speed</p>
+            <button class="btn btn-sm" onclick="createPayment()" id="payBtn" style="background:rgba(243,156,18,0.15);border-color:rgba(243,156,18,0.3);color:var(--orange)">
+                Pay with Crypto
+            </button>
+        </div>
+    </div>
+
+    <div class="spacer"></div>
+    <div class="footer">JetsFlare Services</div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<div class="footer">JetsFlare Services</div>
+<!-- QR Modal -->
+<div class="modal-overlay" id="qrModal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="modal">
+        <h3 id="qrTitle"></h3>
+        <div id="qrCanvas"></div>
+        <br>
+        <button class="btn btn-sm" onclick="document.getElementById('qrModal').classList.remove('active')">Close</button>
+    </div>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
-// Server configs injected by Flask
-const NODES = {{ nodes_json | safe }};
+let currentUser = null;
+let currentLinks = [];
+const savedCode = localStorage.getItem('jf_code');
+const urlRef = '{{ ref }}';
 
-function getBestNode() {
-    if (!NODES || NODES.length === 0) return null;
-    // Just pick first available online node (or random)
-    const online = NODES.filter(n => n.status === 'online');
-    if (online.length === 0) return NODES[0];
-    return online[Math.floor(Math.random() * online.length)];
+// Auto-fill referral code from URL
+if (urlRef) {
+    document.getElementById('regReferral').value = urlRef;
 }
 
-function showToast(msg, duration = 3000) {
+// Auto-login if code saved
+if (savedCode) {
+    document.getElementById('loginCode').value = savedCode;
+    checkStatus();
+}
+
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), duration);
+    setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-function connect(platform) {
-    const node = getBestNode();
-    if (!node) {
-        showToast('Service temporarily unavailable');
+function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => showToast('Copied!')).catch(() => {
+        prompt('Copy:', text);
+    });
+}
+
+// Country flag emoji
+function flag(cc) {
+    if (!cc || cc.length !== 2) return '';
+    return String.fromCodePoint(0x1F1E6 + cc.charCodeAt(0) - 65, 0x1F1E6 + cc.charCodeAt(1) - 65);
+}
+
+async function register() {
+    const btn = document.getElementById('regBtn');
+    const errEl = document.getElementById('regError');
+    errEl.style.display = 'none';
+    btn.textContent = 'Creating...';
+    btn.disabled = true;
+
+    const nickname = document.getElementById('regNickname').value.trim();
+    const referral = document.getElementById('regReferral').value.trim();
+
+    if (!nickname || nickname.length < 2) {
+        errEl.textContent = 'Nickname must be at least 2 characters';
+        errEl.style.display = 'block';
+        btn.textContent = 'Create Account';
+        btn.disabled = false;
         return;
     }
 
-    const link = node.vless_link;
-    const btn = event.currentTarget;
+    try {
+        const resp = await fetch('/go/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nickname, referral_code: referral || undefined })
+        });
+        const data = await resp.json();
 
-    // Copy to clipboard
+        if (!resp.ok) {
+            errEl.textContent = data.error || 'Registration failed';
+            errEl.style.display = 'block';
+            btn.textContent = 'Create Account';
+            btn.disabled = false;
+            return;
+        }
+
+        currentUser = data.user;
+        currentLinks = data.links;
+        localStorage.setItem('jf_code', data.user.code);
+        renderDashboard();
+        showScreen('screenDashboard');
+    } catch (e) {
+        errEl.textContent = 'Network error';
+        errEl.style.display = 'block';
+    }
+
+    btn.textContent = 'Create Account';
+    btn.disabled = false;
+}
+
+async function checkStatus() {
+    const btn = document.getElementById('loginBtn');
+    const errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+
+    const code = document.getElementById('loginCode').value.trim();
+    if (!code) {
+        errEl.textContent = 'Enter your access code';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    btn.textContent = 'Loading...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/go/status', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ code })
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            errEl.textContent = data.error || 'Not found';
+            errEl.style.display = 'block';
+            btn.textContent = 'Check Status';
+            btn.disabled = false;
+            localStorage.removeItem('jf_code');
+            return;
+        }
+
+        currentUser = data.user;
+        currentLinks = data.links;
+        localStorage.setItem('jf_code', data.user.code);
+        renderDashboard();
+        showScreen('screenDashboard');
+    } catch (e) {
+        errEl.textContent = 'Network error';
+        errEl.style.display = 'block';
+    }
+
+    btn.textContent = 'Check Status';
+    btn.disabled = false;
+}
+
+function renderDashboard() {
+    if (!currentUser) return;
+    const u = currentUser;
+
+    document.getElementById('dashNickname').textContent = u.nickname;
+    const badge = document.getElementById('dashBadge');
+    badge.textContent = u.tier.toUpperCase();
+    badge.className = 'badge badge-' + u.tier;
+
+    // Days left
+    const daysEl = document.getElementById('dashDays');
+    if (u.expires) {
+        const days = Math.max(0, Math.ceil((new Date(u.expires) - new Date()) / 86400000));
+        daysEl.textContent = days;
+        daysEl.className = 'stat-val ' + (days > 3 ? 'green' : days > 0 ? 'orange' : 'red');
+    } else {
+        daysEl.textContent = '--';
+    }
+
+    // Traffic
+    const trafficMB = Math.round((u.traffic_used || 0) / 1024 / 1024);
+    const limitMB = u.daily_limit_mb || 0;
+    document.getElementById('dashTraffic').textContent = limitMB > 0
+        ? trafficMB + ' / ' + limitMB + ' MB'
+        : trafficMB + ' MB';
+
+    document.getElementById('dashDevices').textContent = u.device_limit || 2;
+    document.getElementById('dashReferrals').textContent = u.referral_count || 0;
+    document.getElementById('dashCode').textContent = u.code;
+
+    // Referral link
+    const origin = window.location.origin;
+    document.getElementById('dashRefLink').textContent = origin + '/go?ref=' + u.code;
+
+    // VIP promo — hide for VIP users
+    document.getElementById('vipPromo').style.display = u.tier === 'vip' ? 'none' : 'block';
+
+    // Server list
+    renderServers();
+}
+
+function renderServers() {
+    const container = document.getElementById('serverList');
+    if (!currentLinks || currentLinks.length === 0) {
+        container.innerHTML = '<div style="color:var(--dim);text-align:center;padding:20px;font-size:0.9em">No servers available yet</div>';
+        return;
+    }
+
+    let html = '';
+    currentLinks.forEach((s, i) => {
+        html += `
+        <div class="server-item">
+            <div class="server-info">
+                <span class="server-flag">${flag(s.country_code)}</span>
+                <div>
+                    <div class="server-name">${esc(s.node_name || s.country_name)}</div>
+                    <div class="server-city">${esc(s.city || s.country_name)}</div>
+                </div>
+            </div>
+            <div class="server-actions">
+                <button class="btn-icon" onclick="copyConfig(this, ${i})" title="Copy config">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                </button>
+                <button class="btn-icon" onclick="showQR('${esc(s.node_name)}', ${i})" title="QR Code">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M3 11V3h8v8H3zm2-6v4h4V5H5zm8-2v8h8V3h-8zm6 6h-4V5h4v4zM3 21v-8h8v8H3zm2-6v4h4v-4H5zm8 0h2v2h-2zm0 4h2v2h-2zm4-4h2v2h-2zm0 4h2v2h-2z"/></svg>
+                </button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function copyConfig(btn, idx) {
+    const link = currentLinks[idx].link;
     navigator.clipboard.writeText(link).then(() => {
         btn.classList.add('copied');
+        showToast('Config copied!');
         setTimeout(() => btn.classList.remove('copied'), 2000);
+    }).catch(() => prompt('Copy:', link));
+}
 
-        if (platform === 'ios') {
-            showToast('Config copied! Opening App Store...');
-            // Try to open Streisand or V2Box directly, fallback to App Store
-            setTimeout(() => {
-                window.location.href = 'https://apps.apple.com/app/streisand/id6450534064';
-            }, 800);
+function showQR(name, idx) {
+    const link = currentLinks[idx].link;
+    document.getElementById('qrTitle').textContent = name;
+    const container = document.getElementById('qrCanvas');
+    container.innerHTML = '';
+    new QRCode(container, { text: link, width: 260, height: 260, colorDark: '#e0e0e8', colorLight: '#0d0d14', correctLevel: QRCode.CorrectLevel.M });
+    document.getElementById('qrModal').classList.add('active');
+}
+
+function copyRefLink() {
+    const link = document.getElementById('dashRefLink').textContent;
+    copyText(link);
+}
+
+function doLogout() {
+    localStorage.removeItem('jf_code');
+    currentUser = null;
+    currentLinks = [];
+    showScreen('screenLanding');
+}
+
+async function createPayment() {
+    if (!currentUser) return;
+    const btn = document.getElementById('payBtn');
+    btn.textContent = 'Creating invoice...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/payment/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ code: currentUser.code, currency: 'USDT' })
+        });
+        const data = await resp.json();
+
+        if (data.pay_url) {
+            window.open(data.pay_url, '_blank');
+            showToast('Payment page opened');
         } else {
-            showToast('Config copied! Opening Play Store...');
-            setTimeout(() => {
-                window.location.href = 'https://play.google.com/store/apps/details?id=com.v2ray.ang';
-            }, 800);
+            showToast(data.error || 'Payment not available');
         }
-    }).catch(() => {
-        // Fallback: select text in prompt
-        prompt('Copy this config:', link);
-    });
+    } catch (e) {
+        showToast('Payment error');
+    }
+
+    btn.textContent = 'Pay with Crypto';
+    btn.disabled = false;
 }
 </script>
 
