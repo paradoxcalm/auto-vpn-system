@@ -154,7 +154,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get upgrade -y -qq
 apt-get install -y -qq \
-    curl wget unzip jq openssl \
+    curl wget unzip jq openssl lsb-release \
     python3 python3-pip nginx \
     qrencode \
     ufw fail2ban \
@@ -291,13 +291,6 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
     },
     "inbounds": [
         {
-            "tag": "api-in",
-            "listen": "127.0.0.1",
-            "port": 10085,
-            "protocol": "dokodemo-door",
-            "settings": {"address": "127.0.0.1"}
-        },
-        {
             "tag": "vless-ws",
             "listen": "127.0.0.1",
             "port": $XRAY_PORT,
@@ -338,7 +331,6 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
     "routing": {
         "domainStrategy": "IPIfNonMatch",
         "rules": [
-            {"type": "field", "inboundTag": ["api-in"], "outboundTag": "api"},
             {"type": "field", "outboundTag": "block", "protocol": ["bittorrent"]},
             {"type": "field", "outboundTag": "direct", "ip": ["geoip:private"]},
             {"type": "field", "outboundTag": "warp", "inboundTag": ["vless-ws"]}
