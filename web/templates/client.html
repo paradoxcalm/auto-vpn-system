@@ -295,6 +295,26 @@
             </a>
         </div>
 
+        <!-- Speed optimization tip -->
+        <div class="card" style="margin-top:16px;border-color:rgba(0,206,201,0.2);background:rgba(0,206,201,0.04)">
+            <div style="font-size:0.85em;font-weight:600;color:var(--accent2);margin-bottom:8px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><path d="M13 3L4 14h7v7l9-11h-7V3z"/></svg>
+                Speed boost tip
+            </div>
+            <p style="font-size:0.78em;color:var(--dim);line-height:1.5;margin-bottom:10px">
+                Slow connection? Replace the server address in your config with the fastest IP for your ISP.
+                Use <strong style="color:var(--text)">CloudflareSpeedTest</strong> tool to find the best IP automatically.
+            </p>
+            <div style="display:flex;gap:8px">
+                <a href="https://github.com/XIU2/CloudflareSpeedTest/releases" class="btn btn-sm btn-outline" style="flex:1;font-size:0.75em;padding:8px" target="_blank">
+                    Download (PC)
+                </a>
+                <button class="btn btn-sm btn-outline" onclick="showCfTip()" style="flex:1;font-size:0.75em;padding:8px">
+                    How to use
+                </button>
+            </div>
+        </div>
+
         <!-- Referral -->
         <div class="ref-box">
             <h4>Share & get +5 free days</h4>
@@ -566,6 +586,25 @@ function doLogout() {
     currentUser = null;
     currentLinks = [];
     showScreen('screenLanding');
+}
+
+function showCfTip() {
+    document.getElementById('qrTitle').textContent = 'CloudflareSpeedTest';
+    document.getElementById('qrCanvas').innerHTML = `
+        <div style="text-align:left;font-size:0.82em;color:var(--dim);line-height:1.7">
+            <p style="margin-bottom:10px;color:var(--text)">Find the fastest Cloudflare IP for your ISP:</p>
+            <ol style="padding-left:18px">
+                <li>Download <strong>CloudflareSpeedTest</strong> from GitHub</li>
+                <li>Run: <code style="background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;font-size:0.9em">CloudflareST.exe -tl 200 -sl 5 -dn 10</code></li>
+                <li>Copy the first IP from the results</li>
+                <li>In your VPN app, edit the server config</li>
+                <li>Replace the server address with the fastest IP</li>
+                <li>Set <strong>SNI</strong> and <strong>Host</strong> to the original domain</li>
+            </ol>
+            <p style="margin-top:12px;font-size:0.85em;color:var(--accent2)">This can improve speed 3-5x in some regions!</p>
+        </div>
+    `;
+    document.getElementById('qrModal').classList.add('active');
 }
 
 async function createPayment() {

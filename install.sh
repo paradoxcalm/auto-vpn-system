@@ -165,6 +165,41 @@ pip3 install speedtest-cli -q 2>/dev/null || true
 
 log_ok "Dependencies installed"
 
+# ======================== WARP (IP PROTECTION) ========================
+log_step "Installing Cloudflare WARP (outbound IP protection)"
+
+WARP_INSTALLED=false
+
+# Check if WARP is already running
+if command -v warp-cli &>/dev/null && warp-cli status 2>/dev/null | grep -qi "connected"; then
+    log_ok "WARP already running"
+    WARP_INSTALLED=true
+else
+    # Add Cloudflare WARP repo
+    curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg 2>/dev/null
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/cloudflare-client.list
+    apt-get update -qq 2>/dev/null
+
+    if apt-get install -y -qq cloudflare-warp 2>/dev/null; then
+        # Register WARP (free tier — enough for IP masking)
+        warp-cli --accept-tos registration new 2>/dev/null || true
+        # Set WARP to proxy mode (SOCKS5 on 127.0.0.1:40000) — won't touch system routes
+        warp-cli --accept-tos mode proxy 2>/dev/null || true
+        warp-cli --accept-tos proxy port 40000 2>/dev/null || true
+        warp-cli --accept-tos connect 2>/dev/null || true
+
+        sleep 3
+        if warp-cli status 2>/dev/null | grep -qi "connected"; then
+            log_ok "WARP installed (SOCKS5 proxy on 127.0.0.1:40000)"
+            WARP_INSTALLED=true
+        else
+            log_warn "WARP installed but not connected — VPS IP will be visible to websites"
+        fi
+    else
+        log_warn "Could not install WARP — VPS IP will be visible to websites"
+    fi
+fi
+
 # ======================== TCP BBR ========================
 log_step "Enabling TCP BBR"
 
@@ -194,7 +229,18 @@ log_step "Installing Xray-core"
 
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR"
 
+MIN_XRAY_VERSION="25.12.8"
 XRAY_VERSION=$(curl -sf "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r '.tag_name' | tr -d 'v')
+
+# Verify minimum version (v25.12.8+ required for Aparecium resistance)
+XRAY_MAJOR=$(echo "$XRAY_VERSION" | cut -d. -f1)
+XRAY_MINOR=$(echo "$XRAY_VERSION" | cut -d. -f2)
+XRAY_PATCH=$(echo "$XRAY_VERSION" | cut -d. -f3)
+if [[ "$XRAY_MAJOR" -lt 25 ]] || [[ "$XRAY_MAJOR" -eq 25 && "$XRAY_MINOR" -lt 12 ]] || [[ "$XRAY_MAJOR" -eq 25 && "$XRAY_MINOR" -eq 12 && "$XRAY_PATCH" -lt 8 ]]; then
+    log_warn "Latest Xray ($XRAY_VERSION) is below minimum v$MIN_XRAY_VERSION — forcing $MIN_XRAY_VERSION"
+    XRAY_VERSION="$MIN_XRAY_VERSION"
+fi
+
 XRAY_URL="https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-${XRAY_ARCH}.zip"
 
 log_info "Downloading Xray-core v${XRAY_VERSION}..."
@@ -279,6 +325,13 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
         }
     ],
     "outbounds": [
+        {
+            "tag": "warp",
+            "protocol": "socks",
+            "settings": {
+                "servers": [{"address": "127.0.0.1", "port": 40000}]
+            }
+        },
         {"tag": "direct", "protocol": "freedom"},
         {"tag": "block", "protocol": "blackhole"}
     ],
@@ -287,7 +340,8 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
         "rules": [
             {"type": "field", "inboundTag": ["api-in"], "outboundTag": "api"},
             {"type": "field", "outboundTag": "block", "protocol": ["bittorrent"]},
-            {"type": "field", "outboundTag": "block", "ip": ["geoip:private"]}
+            {"type": "field", "outboundTag": "direct", "ip": ["geoip:private"]},
+            {"type": "field", "outboundTag": "warp", "inboundTag": ["vless-ws"]}
         ]
     }
 }

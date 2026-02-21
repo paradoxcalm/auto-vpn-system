@@ -125,6 +125,13 @@ except: print(0)
 " 2>/dev/null || echo "0")
 fi
 
+# === 1.5. WARP health check ===
+if command -v warp-cli &>/dev/null; then
+    if ! warp-cli status 2>/dev/null | grep -qi "connected"; then
+        warp-cli connect 2>/dev/null || true
+    fi
+fi
+
 # === 2. Check Xray & send heartbeat with metrics ===
 
 XRAY_STATUS="online"
