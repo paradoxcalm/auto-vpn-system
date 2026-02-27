@@ -39,6 +39,9 @@ CF_DOMAIN=""
 NODE_NAME=""
 NO_REPORT=false
 XRAY_PORT=10001
+XRAY_DIRECT_PORT=8443
+XRAY_GRPC_PORT=10002
+GRPC_SERVICE_NAME="vpngrpc"
 WS_PATH="/ws"
 
 INSTALL_DIR="/opt/auto-vpn"
@@ -261,8 +264,32 @@ UUID=$(/usr/local/bin/xray uuid)
 
 log_ok "UUID: $UUID"
 
-# ======================== XRAY CONFIG (VLESS + WebSocket) ========================
-log_step "Configuring Xray (VLESS + WebSocket)"
+# ======================== XRAY CONFIG (VLESS multi-inbound) ========================
+log_step "Configuring Xray (VLESS: WS + Direct + gRPC)"
+
+# Build outbounds based on WARP availability
+if [[ "$WARP_INSTALLED" == true ]]; then
+    XRAY_OUTBOUNDS='[
+        {
+            "tag": "warp",
+            "protocol": "socks",
+            "settings": {
+                "servers": [{"address": "127.0.0.1", "port": 40000}]
+            }
+        },
+        {"tag": "direct", "protocol": "freedom"},
+        {"tag": "block", "protocol": "blackhole"}
+    ]'
+    XRAY_DEFAULT_OUT="warp"
+    log_info "Outbound: WARP (via SOCKS5 127.0.0.1:40000)"
+else
+    XRAY_OUTBOUNDS='[
+        {"tag": "direct", "protocol": "freedom"},
+        {"tag": "block", "protocol": "blackhole"}
+    ]'
+    XRAY_DEFAULT_OUT="direct"
+    log_info "Outbound: direct (WARP not available)"
+fi
 
 cat > "$CONFIG_DIR/config.json" << XRAYCONF
 {
@@ -308,7 +335,67 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
             "streamSettings": {
                 "network": "ws",
                 "wsSettings": {
-                    "path": "$WS_PATH"
+                    "path": "$WS_PATH",
+                    "maxEarlyData": 2048,
+                    "earlyDataHeaderName": "Sec-WebSocket-Protocol"
+                }
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": ["http", "tls", "quic"]
+            }
+        },
+        {
+            "tag": "vless-direct",
+            "listen": "0.0.0.0",
+            "port": $XRAY_DIRECT_PORT,
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$UUID",
+                        "email": "default@panel",
+                        "level": 0
+                    }
+                ],
+                "decryption": "none"
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "/etc/xray/ssl/cert.pem",
+                            "keyFile": "/etc/xray/ssl/key.pem"
+                        }
+                    ]
+                }
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": ["http", "tls", "quic"]
+            }
+        },
+        {
+            "tag": "vless-grpc",
+            "listen": "127.0.0.1",
+            "port": $XRAY_GRPC_PORT,
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$UUID",
+                        "email": "default@panel",
+                        "level": 0
+                    }
+                ],
+                "decryption": "none"
+            },
+            "streamSettings": {
+                "network": "grpc",
+                "grpcSettings": {
+                    "serviceName": "$GRPC_SERVICE_NAME"
                 }
             },
             "sniffing": {
@@ -317,23 +404,14 @@ cat > "$CONFIG_DIR/config.json" << XRAYCONF
             }
         }
     ],
-    "outbounds": [
-        {
-            "tag": "warp",
-            "protocol": "socks",
-            "settings": {
-                "servers": [{"address": "127.0.0.1", "port": 40000}]
-            }
-        },
-        {"tag": "direct", "protocol": "freedom"},
-        {"tag": "block", "protocol": "blackhole"}
-    ],
+    "outbounds": $XRAY_OUTBOUNDS,
     "routing": {
         "domainStrategy": "IPIfNonMatch",
         "rules": [
+            {"type": "field", "inboundTag": ["api"], "outboundTag": "direct"},
             {"type": "field", "outboundTag": "block", "protocol": ["bittorrent"]},
             {"type": "field", "outboundTag": "direct", "ip": ["geoip:private"]},
-            {"type": "field", "outboundTag": "warp", "inboundTag": ["vless-ws"]}
+            {"type": "field", "outboundTag": "$XRAY_DEFAULT_OUT", "inboundTag": ["vless-ws", "vless-direct", "vless-grpc"]}
         ]
     }
 }
@@ -343,7 +421,10 @@ mkdir -p /var/log/xray
 chown -R nobody:nogroup /var/log/xray
 chmod 755 /var/log/xray
 
-log_ok "Xray config created (VLESS+WS on 127.0.0.1:$XRAY_PORT)"
+log_ok "Xray config created:"
+log_info "  WS:     127.0.0.1:$XRAY_PORT (via Nginx/CDN)"
+log_info "  Direct: 0.0.0.0:$XRAY_DIRECT_PORT (TCP+TLS)"
+log_info "  gRPC:   127.0.0.1:$XRAY_GRPC_PORT (via Nginx/CDN)"
 
 # ======================== XRAY SERVICE ========================
 log_step "Creating Xray service"
@@ -390,31 +471,79 @@ openssl req -x509 -nodes -newkey rsa:2048 \
     -out /etc/nginx/ssl/cloudflare.pem \
     -days 3650 -subj "/CN=$CF_DOMAIN" 2>/dev/null
 
+# Copy certs for Xray direct inbound (runs as nobody, can't read nginx dir)
+mkdir -p /etc/xray/ssl
+cp /etc/nginx/ssl/cloudflare.pem /etc/xray/ssl/cert.pem
+cp /etc/nginx/ssl/cloudflare.key /etc/xray/ssl/key.pem
+chown -R nobody:nogroup /etc/xray/ssl
+chmod 600 /etc/xray/ssl/key.pem
+
 log_ok "SSL certificate generated"
 
 # ======================== NGINX (WebSocket Reverse Proxy) ========================
 log_step "Configuring Nginx reverse proxy"
 
+# Detect Nginx version for http2 directive syntax
+NGINX_VER=$(nginx -v 2>&1 | grep -oP '[\d.]+' | head -1)
+NGINX_MAJOR=$(echo "$NGINX_VER" | cut -d. -f1)
+NGINX_MINOR=$(echo "$NGINX_VER" | cut -d. -f2)
+if [[ "$NGINX_MAJOR" -gt 1 ]] || [[ "$NGINX_MAJOR" -eq 1 && "$NGINX_MINOR" -ge 25 ]]; then
+    HTTP2_LISTEN="listen 443 ssl;"
+    HTTP2_DIRECTIVE="    http2 on;"
+else
+    HTTP2_LISTEN="listen 443 ssl http2;"
+    HTTP2_DIRECTIVE=""
+fi
+
 cat > /etc/nginx/sites-available/vless-ws << NGINXEOF
+upstream xray_backend {
+    server 127.0.0.1:$XRAY_PORT;
+    keepalive 64;
+}
+
 server {
-    listen 443 ssl http2;
+    $HTTP2_LISTEN
+    $HTTP2_DIRECTIVE
     server_name $CF_DOMAIN;
 
     ssl_certificate /etc/nginx/ssl/cloudflare.pem;
     ssl_certificate_key /etc/nginx/ssl/cloudflare.key;
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
 
     # WebSocket proxy to Xray
     location $WS_PATH {
         proxy_redirect off;
-        proxy_pass http://127.0.0.1:$XRAY_PORT;
+        proxy_pass http://xray_backend;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+
+        # Critical for WebSocket performance
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+
+        # TCP tuning
+        tcp_nodelay on;
+        tcp_nopush on;
+    }
+
+    # gRPC proxy to Xray (BPLA profile)
+    location /$GRPC_SERVICE_NAME {
+        grpc_pass grpc://127.0.0.1:$XRAY_GRPC_PORT;
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+        grpc_set_header X-Real-IP \$remote_addr;
     }
 
     # Normal page — looks like regular website
@@ -446,8 +575,9 @@ ufw default allow outgoing
 ufw allow ssh
 ufw allow 80/tcp
 ufw allow 443/tcp
+ufw allow $XRAY_DIRECT_PORT/tcp
 ufw --force enable > /dev/null 2>&1
-log_ok "Firewall configured (SSH, 80, 443)"
+log_ok "Firewall configured (SSH, 80, 443, $XRAY_DIRECT_PORT)"
 
 # ======================== FAIL2BAN ========================
 log_step "Configuring fail2ban"
@@ -532,8 +662,10 @@ if [[ "$NO_REPORT" == false && -n "$API_URL" && -n "$API_KEY" ]]; then
     "vless_link_template": "$VLESS_TEMPLATE",
     "uuid": "$UUID",
     "ws_path": "$WS_PATH",
+    "direct_port": $XRAY_DIRECT_PORT,
+    "grpc_service_name": "$GRPC_SERVICE_NAME",
     "xray_version": "$XRAY_VERSION",
-    "protocols": ["vless-ws-tls"],
+    "protocols": ["vless-ws-tls", "vless-tcp-tls", "vless-grpc-tls"],
     "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 REPORTJSON
@@ -581,7 +713,7 @@ echo -e "  ${BOLD}Server:${NC}     $SERVER_IP"
 echo -e "  ${BOLD}Domain:${NC}     $CF_DOMAIN"
 echo -e "  ${BOLD}Location:${NC}   $CITY, $COUNTRY_NAME"
 echo -e "  ${BOLD}Xray:${NC}       v$XRAY_VERSION"
-echo -e "  ${BOLD}Transport:${NC}  VLESS + WebSocket + TLS (Cloudflare CDN)"
+echo -e "  ${BOLD}Profiles:${NC}   WiFi (direct:$XRAY_DIRECT_PORT) | Mobile (WS+CDN) | BPLA (gRPC+CDN)"
 echo ""
 echo -e "  ${BOLD}VLESS Link:${NC}"
 echo -e "  ${CYAN}$VLESS_LINK${NC}"

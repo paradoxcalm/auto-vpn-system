@@ -263,6 +263,7 @@
             <option value="blocked">Blocked</option>
             <option value="expired">Expired</option>
         </select>
+        <button class="btn-save" onclick="showCreateUser()" style="margin:0;padding:9px 18px;font-size:0.85em">+ Create User</button>
     </div>
     <div style="overflow-x:auto">
     <table>
@@ -316,6 +317,41 @@
         <div id="modalContent"></div>
         <div class="modal-actions">
             <button class="btn-cancel" onclick="document.getElementById('userModal').classList.remove('active')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal-bg" id="createModal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="modal-box">
+        <h3>Create User</h3>
+        <div class="modal-row">
+            <label>Nickname *</label>
+            <input type="text" id="createNickname" placeholder="Username" maxlength="30">
+        </div>
+        <div class="modal-row">
+            <label>Tier</label>
+            <select id="createTier" onchange="onCreateTierChange()">
+                <option value="free">Free</option>
+                <option value="vip">VIP</option>
+            </select>
+        </div>
+        <div class="modal-row">
+            <label>Device limit</label>
+            <input type="number" id="createDevices" value="2" min="1" max="50">
+        </div>
+        <div class="modal-row">
+            <label>Daily traffic limit (MB, 0 = unlimited)</label>
+            <input type="number" id="createTraffic" value="1024" min="0" max="999999">
+        </div>
+        <div class="modal-row">
+            <label>Subscription (days)</label>
+            <input type="number" id="createDays" value="30" min="1" max="3650">
+        </div>
+        <div id="createError" style="color:var(--red);font-size:0.85em;display:none;margin-top:8px"></div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="document.getElementById('createModal').classList.remove('active')">Cancel</button>
+            <button class="btn-confirm" onclick="submitCreateUser()">Create</button>
         </div>
     </div>
 </div>
@@ -467,11 +503,15 @@ async function editUser(id) {
         </div>
         <div class="modal-row">
             <label>Device Limit</label>
-            <input type="number" id="editDevices" value="${u.device_limit}" min="1" max="20">
+            <input type="number" id="editDevices" value="${u.device_limit}" min="1" max="50">
         </div>
         <div class="modal-row">
-            <label>Extend Subscription (days)</label>
-            <input type="number" id="editExtend" value="0" min="0" max="365">
+            <label>Daily Traffic Limit (MB, 0 = unlimited)</label>
+            <input type="number" id="editTraffic" value="${u.daily_traffic_limit_mb}" min="0" max="999999">
+        </div>
+        <div class="modal-row">
+            <label>Extend Subscription (+ days)</label>
+            <input type="number" id="editExtend" value="0" min="0" max="3650">
         </div>
         <div class="modal-row">
             <label>Status: <span class="badge badge-${u.status}">${u.status}</span> | Days left: ${days} | Traffic today: ${trafficMB} MB | Referrals: ${u.referral_count || 0}</label>
@@ -485,16 +525,14 @@ async function editUser(id) {
 }
 
 async function saveUserEdit(id) {
-    const tier = document.getElementById('editTier').value;
-    const devices = parseInt(document.getElementById('editDevices').value);
-    const extend = parseInt(document.getElementById('editExtend').value);
+    const data = {
+        tier: document.getElementById('editTier').value,
+        device_limit: parseInt(document.getElementById('editDevices').value),
+        daily_traffic_limit_mb: parseInt(document.getElementById('editTraffic').value),
+        extend_days: parseInt(document.getElementById('editExtend').value),
+    };
 
-    await api('/api/admin/users/' + id + '/tier', { method: 'POST', body: JSON.stringify({ tier }) });
-    await api('/api/admin/users/' + id + '/device-limit', { method: 'POST', body: JSON.stringify({ limit: devices }) });
-    if (extend > 0) {
-        await api('/api/admin/users/' + id + '/extend', { method: 'POST', body: JSON.stringify({ days: extend }) });
-    }
-
+    await api('/api/admin/users/' + id + '/update', { method: 'POST', body: JSON.stringify(data) });
     document.getElementById('userModal').classList.remove('active');
     loadUsers();
 }
@@ -667,6 +705,64 @@ async function saveSettings() {
     const msg = document.getElementById('settingsMsg');
     msg.style.display = 'block';
     setTimeout(() => { msg.style.display = 'none'; }, 3000);
+}
+
+// ============== Create User ==============
+function showCreateUser() {
+    document.getElementById('createNickname').value = '';
+    document.getElementById('createTier').value = 'free';
+    document.getElementById('createDevices').value = '2';
+    document.getElementById('createTraffic').value = '1024';
+    document.getElementById('createDays').value = '30';
+    document.getElementById('createError').style.display = 'none';
+    document.getElementById('createModal').classList.add('active');
+}
+
+function onCreateTierChange() {
+    const tier = document.getElementById('createTier').value;
+    if (tier === 'vip') {
+        document.getElementById('createDevices').value = '5';
+        document.getElementById('createTraffic').value = '0';
+    } else {
+        document.getElementById('createDevices').value = '2';
+        document.getElementById('createTraffic').value = '1024';
+    }
+}
+
+async function submitCreateUser() {
+    const nickname = document.getElementById('createNickname').value.trim();
+    const errEl = document.getElementById('createError');
+    if (!nickname || nickname.length < 2) {
+        errEl.textContent = 'Nickname must be at least 2 characters';
+        errEl.style.display = 'block';
+        return;
+    }
+    errEl.style.display = 'none';
+
+    const data = {
+        nickname,
+        tier: document.getElementById('createTier').value,
+        device_limit: parseInt(document.getElementById('createDevices').value),
+        daily_traffic_limit_mb: parseInt(document.getElementById('createTraffic').value),
+        subscription_days: parseInt(document.getElementById('createDays').value),
+    };
+
+    const resp = await fetch('/api/admin/users/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    const result = await resp.json();
+
+    if (!resp.ok) {
+        errEl.textContent = result.error || 'Create failed';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    document.getElementById('createModal').classList.remove('active');
+    loadUsers();
+    alert('User created! Code: ' + result.referral_code);
 }
 
 // ============== Helpers ==============

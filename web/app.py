@@ -9,13 +9,14 @@ import json
 import hashlib
 import secrets
 import re
+import base64
 from datetime import datetime, timezone
 from pathlib import Path
 from functools import wraps
 
 from flask import (
     Flask, request, jsonify, render_template,
-    session, redirect, url_for, g,
+    session, redirect, url_for, g, Response,
 )
 
 import models
@@ -215,7 +216,13 @@ def client_register():
         return jsonify({"error": str(e)}), 500
 
     links = models.generate_vless_links(db, user["uuid"])
+    profiles = models.generate_vless_profiles(db, user["uuid"])
     traffic = models.get_user_traffic_today(db, user["id"])
+    servers = models.get_nodes_public_stats(db)
+
+    sub_url = ""
+    if PANEL_URL:
+        sub_url = f"{PANEL_URL.rstrip('/')}/go/sub/{user['referral_code']}"
 
     return jsonify({
         "status": "ok",
@@ -230,6 +237,9 @@ def client_register():
             "referral_count": 0,
         },
         "links": links,
+        "profiles": profiles,
+        "subscription_url": sub_url,
+        "servers": servers,
     })
 
 
@@ -249,8 +259,14 @@ def client_status():
         return jsonify({"error": "User not found"}), 404
 
     links = models.generate_vless_links(db, user["uuid"])
+    profiles = models.generate_vless_profiles(db, user["uuid"])
     traffic = models.get_user_traffic_today(db, user["id"])
     ref_count = models.get_referral_count(db, user["id"])
+    servers = models.get_nodes_public_stats(db)
+
+    sub_url = ""
+    if PANEL_URL:
+        sub_url = f"{PANEL_URL.rstrip('/')}/go/sub/{user['referral_code']}"
 
     return jsonify({
         "status": "ok",
@@ -266,7 +282,42 @@ def client_status():
             "referral_count": ref_count,
         },
         "links": links,
+        "profiles": profiles,
+        "subscription_url": sub_url,
+        "servers": servers,
     })
+
+
+# ======================== SUBSCRIPTION ENDPOINT ========================
+
+@app.route("/go/sub/<user_code>")
+def client_subscription(user_code):
+    """V2Ray/Hiddify subscription endpoint — returns base64 VLESS links."""
+    db = get_db()
+    user = models.get_user_by_code(db, user_code.strip().lower())
+    if not user:
+        return Response("User not found", status=404)
+    if user["status"] != "active":
+        return Response("Account suspended", status=403)
+
+    links = models.generate_all_links_flat(db, user["uuid"])
+    if not links:
+        return Response("No servers available", status=503)
+
+    payload = base64.b64encode("\n".join(links).encode()).decode()
+
+    traffic_today = models.get_user_traffic_today(db, user["id"])
+    limit_mb = user["daily_traffic_limit_mb"]
+    total_bytes = limit_mb * 1024 * 1024 if limit_mb > 0 else 0
+
+    headers = {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Profile-Update-Interval": "12",
+        "Subscription-Userinfo": f"upload=0; download={traffic_today}; total={total_bytes}",
+        "Profile-Title": "base64:" + base64.b64encode(b"JetsFlare VPN").decode(),
+    }
+
+    return Response(payload, headers=headers)
 
 
 # ======================== PAYMENT ========================
@@ -433,6 +484,44 @@ def admin_device_limit(user_id):
     limit = int(data.get("limit", 2))
     db = get_db()
     models.update_user(db, user_id, device_limit=limit)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/admin/users/create", methods=["POST"])
+@require_admin_api
+def admin_create_user():
+    data = request.get_json()
+    nickname = (data.get("nickname") or "").strip()
+    if not nickname or len(nickname) < 2:
+        return jsonify({"error": "Nickname required (min 2 chars)"}), 400
+    db = get_db()
+    user = models.create_user_admin(
+        db,
+        nickname=nickname,
+        tier=data.get("tier", "free"),
+        device_limit=int(data["device_limit"]) if data.get("device_limit") else None,
+        daily_traffic_limit_mb=int(data["daily_traffic_limit_mb"]) if data.get("daily_traffic_limit_mb") is not None else None,
+        subscription_days=int(data.get("subscription_days", 30)),
+    )
+    return jsonify(user)
+
+
+@app.route("/api/admin/users/<int:user_id>/update", methods=["POST"])
+@require_admin_api
+def admin_update_user(user_id):
+    data = request.get_json()
+    db = get_db()
+    updates = {}
+    if "tier" in data:
+        updates["tier"] = data["tier"]
+    if "device_limit" in data:
+        updates["device_limit"] = int(data["device_limit"])
+    if "daily_traffic_limit_mb" in data:
+        updates["daily_traffic_limit_mb"] = int(data["daily_traffic_limit_mb"])
+    if updates:
+        models.update_user(db, user_id, **updates)
+    if data.get("extend_days") and int(data["extend_days"]) > 0:
+        models.extend_subscription(db, user_id, int(data["extend_days"]))
     return jsonify({"status": "ok"})
 
 

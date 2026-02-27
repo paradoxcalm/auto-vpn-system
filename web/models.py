@@ -145,6 +145,9 @@ def init_db(data_dir):
     # Migrate: add monitoring columns to existing nodes table
     _migrate_add_node_metrics(db)
 
+    # Migrate: add multi-profile columns to nodes
+    _migrate_add_profile_columns(db)
+
     # Seed default settings
     for key, value in DEFAULT_SETTINGS.items():
         db.execute(
@@ -174,6 +177,19 @@ def _migrate_add_node_metrics(db):
         "connections": "INTEGER DEFAULT 0",
         "uptime_seconds": "INTEGER DEFAULT 0",
         "metrics_updated_at": "TEXT",
+    }
+    for col, col_type in new_cols.items():
+        if col not in columns:
+            db.execute(f"ALTER TABLE nodes ADD COLUMN {col} {col_type}")
+
+
+def _migrate_add_profile_columns(db):
+    """Add multi-profile columns to nodes table if they don't exist."""
+    columns = [r[1] for r in db.execute("PRAGMA table_info(nodes)").fetchall()]
+    new_cols = {
+        "direct_port": "INTEGER DEFAULT 8443",
+        "grpc_service_name": "TEXT DEFAULT 'vpngrpc'",
+        "cf_clean_ip": "TEXT",
     }
     for col, col_type in new_cols.items():
         if col not in columns:
@@ -315,6 +331,31 @@ def create_user(db, nickname, referral_code_used=None, telegram_id=None, telegra
 
     db.commit()
 
+    return get_user(db, user_id)
+
+
+def create_user_admin(db, nickname, tier="free", device_limit=None, daily_traffic_limit_mb=None, subscription_days=30):
+    """Admin creates a user with custom parameters."""
+    user_uuid = str(_uuid.uuid4())
+    ref_code = _gen_referral_code(db)
+
+    if device_limit is None:
+        key = "vip_device_limit" if tier == "vip" else "free_device_limit"
+        device_limit = int(get_setting(db, key))
+    if daily_traffic_limit_mb is None:
+        daily_traffic_limit_mb = 0 if tier == "vip" else int(get_setting(db, "free_daily_traffic_mb"))
+
+    expires = (datetime.now(timezone.utc) + timedelta(days=subscription_days)).isoformat()
+
+    db.execute(
+        """INSERT INTO users
+           (uuid, nickname, tier, status, device_limit, daily_traffic_limit_mb,
+            subscription_expires_at, referral_code)
+           VALUES (?, ?, ?, 'active', ?, ?, ?, ?)""",
+        (user_uuid, nickname, tier, device_limit, daily_traffic_limit_mb, expires, ref_code),
+    )
+    user_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    db.commit()
     return get_user(db, user_id)
 
 
@@ -463,14 +504,15 @@ def upsert_node(db, data):
         """INSERT INTO nodes
            (id, node_name, server_ip, cf_domain, country_code, country_name,
             city, isp, protocols, xray_version, vless_link, vless_link_template,
-            ws_path, status, last_seen, installed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, ?)
+            ws_path, direct_port, grpc_service_name, status, last_seen, installed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, ?)
            ON CONFLICT(id) DO UPDATE SET
             node_name=excluded.node_name, cf_domain=excluded.cf_domain,
             country_code=excluded.country_code, country_name=excluded.country_name,
             city=excluded.city, isp=excluded.isp, protocols=excluded.protocols,
             xray_version=excluded.xray_version, vless_link=excluded.vless_link,
             vless_link_template=excluded.vless_link_template, ws_path=excluded.ws_path,
+            direct_port=excluded.direct_port, grpc_service_name=excluded.grpc_service_name,
             status='online', last_seen=excluded.last_seen""",
         (
             node_id,
@@ -486,6 +528,8 @@ def upsert_node(db, data):
             vless_link,
             template,
             data.get("ws_path", "/ws"),
+            data.get("direct_port", 8443),
+            data.get("grpc_service_name", "vpngrpc"),
             datetime.now(timezone.utc).isoformat(),
             data.get("installed_at", ""),
         ),
@@ -533,6 +577,21 @@ def update_node_heartbeat(db, node_id, metrics=None):
     db.commit()
 
 
+# ======================== PUBLIC NODE STATS ========================
+
+
+def get_nodes_public_stats(db):
+    """Return node metrics safe for public display (no IPs/secrets)."""
+    rows = db.execute(
+        """SELECT node_name, country_code, country_name, city, status,
+                  ping_ms, download_mbps, upload_mbps,
+                  cpu_percent, ram_percent, connections,
+                  uptime_seconds, metrics_updated_at, last_seen
+           FROM nodes ORDER BY ping_ms"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 # ======================== ACTIVE CLIENTS FOR NODES ========================
 
 
@@ -544,7 +603,7 @@ def get_active_clients(db):
            FROM users u
            WHERE u.status = 'active'
              AND (u.subscription_expires_at IS NULL
-                  OR u.subscription_expires_at > datetime('now'))""",
+                  OR u.subscription_expires_at > datetime('now', '-1 day'))""",
     ).fetchall()
 
     clients = []
@@ -720,23 +779,103 @@ def get_dashboard_stats(db):
 # ======================== VLESS LINK GENERATION ========================
 
 
-def generate_vless_links(db, user_uuid):
-    """Generate VLESS links for a user across all online nodes."""
+def _build_vless_uri(uuid, address, port, name, **params):
+    """Build a VLESS URI from components."""
+    from urllib.parse import quote, urlencode
+    qs = urlencode({k: v for k, v in params.items() if v}, quote_via=quote)
+    return f"vless://{uuid}@{address}:{port}?{qs}#{quote(name)}"
+
+
+def generate_vless_profiles(db, user_uuid):
+    """Generate multi-profile VLESS links per node (WiFi/Mobile/BPLA + RU-Zapret)."""
     nodes = db.execute(
-        "SELECT * FROM nodes WHERE status = 'online' AND vless_link_template IS NOT NULL AND vless_link_template != ''"
+        "SELECT * FROM nodes WHERE status = 'online'"
     ).fetchall()
 
-    links = []
+    result = []
     for node in nodes:
-        template = node["vless_link_template"]
-        link = template.replace("{uuid}", user_uuid)
-        # Also replace {node_name} if present
-        link = link.replace("{node_name}", node["node_name"])
-        links.append({
-            "node_name": node["node_name"],
-            "country_code": node["country_code"],
-            "country_name": node["country_name"],
-            "city": node["city"],
-            "link": link,
+        ip = node["server_ip"]
+        domain = node["cf_domain"] or ip
+        ws_path = node["ws_path"] or "/ws"
+        direct_port = node["direct_port"] or 8443
+        grpc_svc = node["grpc_service_name"] or "vpngrpc"
+        cc = node["country_code"] or "XX"
+        name = node["node_name"] or "VPN"
+        protocols = node["protocols"] or '["vless-ws-tls"]'
+        # Clean IP — fastest Cloudflare IP for CDN profiles
+        clean_ip = node["cf_clean_ip"] if "cf_clean_ip" in node.keys() else None
+        cdn_addr = clean_ip or domain
+
+        profiles = []
+
+        if "vless-ws-zapret" in protocols:
+            # RU node with zapret DPI bypass — single WS profile via self-signed TLS
+            profiles.append({
+                "key": "zapret",
+                "label": "РФ",
+                "link": _build_vless_uri(
+                    user_uuid, ip, 443, "РФ",
+                    type="ws", security="tls", sni=ip,
+                    host=ip, path=ws_path, fp="chrome",
+                    allowInsecure="1",
+                ),
+            })
+        else:
+            # Standard CDN node — Mobile + BPLA (Stealth)
+            # Mobile — WebSocket + CDN (reliable, bypasses blocks)
+            profiles.append({
+                "key": "mobile",
+                "label": "VPN",
+                "link": _build_vless_uri(
+                    user_uuid, cdn_addr, 443, "VPN",
+                    type="ws", security="tls", sni=domain,
+                    host=domain, path=ws_path, fp="chrome",
+                ),
+            })
+
+            # BPLA — gRPC + CDN (maximum stealth, for whitelists)
+            profiles.append({
+                "key": "bpla",
+                "label": "VPN+",
+                "link": _build_vless_uri(
+                    user_uuid, cdn_addr, 443, "VPN+",
+                    type="grpc", security="tls", sni=domain,
+                    serviceName=grpc_svc, fp="chrome", mode="gun",
+                ),
+            })
+
+        result.append({
+            "node_name": name,
+            "country_code": cc,
+            "country_name": node["country_name"] or "Unknown",
+            "city": node["city"] or "",
+            "profiles": profiles,
         })
+
+    return result
+
+
+def generate_vless_links(db, user_uuid):
+    """Backward-compatible: flatten profiles into a flat link list."""
+    all_profiles = generate_vless_profiles(db, user_uuid)
+    links = []
+    for node in all_profiles:
+        for p in node["profiles"]:
+            links.append({
+                "node_name": f"{p['label']} ({node['node_name']})",
+                "country_code": node["country_code"],
+                "country_name": node["country_name"],
+                "city": node["city"],
+                "link": p["link"],
+            })
+    return links
+
+
+def generate_all_links_flat(db, user_uuid):
+    """Return flat list of all VLESS URIs for subscription endpoint."""
+    all_profiles = generate_vless_profiles(db, user_uuid)
+    links = []
+    for node in all_profiles:
+        for p in node["profiles"]:
+            links.append(p["link"])
     return links

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -120,11 +120,67 @@
             padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
         }
         .server-item:last-child { border-bottom: none; }
-        .server-info { display: flex; align-items: center; gap: 12px; }
+        .server-info { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
         .server-flag { font-size: 1.5em; }
         .server-name { font-weight: 600; font-size: 0.95em; }
         .server-city { font-size: 0.75em; color: var(--dim); }
         .server-actions { display: flex; gap: 6px; }
+
+        /* Profile tabs */
+        .tab-bar { display: flex; gap: 4px; margin-bottom: 12px; }
+        .tab-btn {
+            flex: 1; padding: 10px 8px; border-radius: 10px;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+            color: var(--dim); font-size: 0.8em; font-weight: 600;
+            font-family: inherit; cursor: pointer; transition: all 0.2s;
+            text-align: center;
+        }
+        .tab-btn.active { background: rgba(124,108,240,0.12); border-color: var(--accent); color: var(--accent); }
+
+        /* Subscription box */
+        .sub-box {
+            background: linear-gradient(135deg, rgba(124,108,240,0.08), rgba(0,206,201,0.08));
+            border: 1px solid rgba(124,108,240,0.25); border-radius: 14px;
+            padding: 18px; margin-bottom: 16px; text-align: center;
+        }
+        .sub-box h4 { font-size: 0.9em; margin-bottom: 6px; color: var(--accent); }
+        .sub-box p { font-size: 0.78em; color: var(--dim); margin-bottom: 12px; line-height: 1.5; }
+        .sub-url {
+            font-family: 'SF Mono', monospace; font-size: 0.72em;
+            color: var(--accent2); word-break: break-all; margin-bottom: 10px;
+            padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px;
+        }
+        /* Server stats */
+        .stats-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 14px; margin-bottom: 10px;
+        }
+        .stats-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .stats-header-left { display: flex; align-items: center; gap: 10px; }
+        .stats-header .server-flag { font-size: 1.3em; }
+        .stats-name { font-weight: 600; font-size: 0.9em; }
+        .stats-city { font-size: 0.7em; color: var(--dim); }
+        .online-badge {
+            font-size: 0.65em; padding: 2px 8px; border-radius: 10px;
+            font-weight: 600; text-transform: uppercase;
+        }
+        .online-badge.on { background: rgba(0,184,148,0.15); color: var(--green); }
+        .online-badge.off { background: rgba(231,76,60,0.15); color: var(--red); }
+        .stats-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+        }
+        .mini-stat { text-align: center; }
+        .mini-stat-val { font-size: 0.95em; font-weight: 700; }
+        .mini-stat-label { font-size: 0.6em; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
+        .load-bar {
+            width: 100%; height: 4px; background: rgba(255,255,255,0.06);
+            border-radius: 2px; margin-top: 10px; overflow: hidden;
+        }
+        .load-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
         .btn-icon {
             width: 38px; height: 38px; border-radius: 10px;
             background: rgba(255,255,255,0.05); border: 1px solid var(--border);
@@ -209,41 +265,41 @@
     <!-- SCREEN: Landing -->
     <div class="screen active" id="screenLanding">
         <button class="btn btn-primary" onclick="showScreen('screenRegister')" style="margin-bottom:12px">
-            Get Started
+            Начать
         </button>
         <button class="btn btn-outline" onclick="showScreen('screenLogin')">
-            I have an access code
+            У меня есть код доступа
         </button>
     </div>
 
     <!-- SCREEN: Register -->
     <div class="screen" id="screenRegister">
         <div class="input-group">
-            <label>Choose a nickname</label>
-            <input type="text" id="regNickname" placeholder="Your name" maxlength="30" autocomplete="off">
+            <label>Придумайте никнейм</label>
+            <input type="text" id="regNickname" placeholder="Ваше имя" maxlength="30" autocomplete="off">
         </div>
         <div class="input-group">
-            <label>Referral code (optional)</label>
-            <input type="text" id="regReferral" placeholder="e.g. a3f7bc12" maxlength="8" autocomplete="off">
+            <label>Реферальный код (необязательно)</label>
+            <input type="text" id="regReferral" placeholder="напр. a3f7bc12" maxlength="8" autocomplete="off">
         </div>
         <div id="regError" class="error-msg" style="display:none"></div>
         <button class="btn btn-primary" onclick="register()" id="regBtn">
-            Create Account
+            Создать аккаунт
         </button>
-        <button class="link-btn" onclick="showScreen('screenLanding')" style="display:block;margin:12px auto 0;text-align:center">Back</button>
+        <button class="link-btn" onclick="showScreen('screenLanding')" style="display:block;margin:12px auto 0;text-align:center">Назад</button>
     </div>
 
     <!-- SCREEN: Login with code -->
     <div class="screen" id="screenLogin">
         <div class="input-group">
-            <label>Your access code</label>
-            <input type="text" id="loginCode" placeholder="e.g. a3f7bc12" maxlength="8" autocomplete="off">
+            <label>Ваш код доступа</label>
+            <input type="text" id="loginCode" placeholder="напр. a3f7bc12" maxlength="8" autocomplete="off">
         </div>
         <div id="loginError" class="error-msg" style="display:none"></div>
         <button class="btn btn-primary" onclick="checkStatus()" id="loginBtn">
-            Check Status
+            Войти
         </button>
-        <button class="link-btn" onclick="showScreen('screenLanding')" style="display:block;margin:12px auto 0;text-align:center">Back</button>
+        <button class="link-btn" onclick="showScreen('screenLanding')" style="display:block;margin:12px auto 0;text-align:center">Назад</button>
     </div>
 
     <!-- SCREEN: Dashboard (logged in user) -->
@@ -259,81 +315,108 @@
         <div class="status-grid">
             <div class="stat-card">
                 <div class="stat-val green" id="dashDays">--</div>
-                <div class="stat-label">Days left</div>
+                <div class="stat-label">Дней осталось</div>
             </div>
             <div class="stat-card">
                 <div class="stat-val" id="dashTraffic">--</div>
-                <div class="stat-label">Traffic today</div>
+                <div class="stat-label">Трафик сегодня</div>
             </div>
             <div class="stat-card">
                 <div class="stat-val" id="dashDevices">--</div>
-                <div class="stat-label">Devices</div>
+                <div class="stat-label">Устройства</div>
             </div>
             <div class="stat-card">
                 <div class="stat-val" id="dashReferrals">--</div>
-                <div class="stat-label">Referrals</div>
+                <div class="stat-label">Рефералы</div>
             </div>
         </div>
 
-        <div class="section-title">Your access code — save it!</div>
+        <div class="section-title">Ваш код доступа — сохраните!</div>
         <div class="code-display" id="dashCode" onclick="copyText(this.textContent.trim())"></div>
 
-        <div class="section-title">Connection profiles</div>
-        <div class="card" id="serverList">
-            <div style="color:var(--dim);text-align:center;padding:20px;font-size:0.9em">Loading servers...</div>
+        <!-- Subscription -->
+        <div class="sub-box" id="subSection" style="display:none">
+            <h4>Авто-подписка</h4>
+            <p>Добавьте эту ссылку в Hiddify как подписку — серверы будут обновляться автоматически</p>
+            <div class="sub-url" id="subUrl"></div>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-sm btn-green" style="flex:1" onclick="copySubUrl()">Копировать</button>
+                <button class="btn btn-sm btn-outline" style="flex:1" onclick="showSubQR()">QR код</button>
+            </div>
         </div>
 
-        <div class="section-title">Get the app</div>
-        <div style="display:flex;gap:10px">
-            <a href="https://apps.apple.com/app/streisand/id6450534064" class="btn btn-sm btn-outline" style="flex:1" target="_blank">
+        <div class="section-title">Статус серверов</div>
+        <div id="serverStats">
+            <div style="color:var(--dim);text-align:center;padding:12px;font-size:0.8em">Загрузка...</div>
+        </div>
+
+        <div class="section-title">Профили подключения</div>
+        <div class="tab-bar" id="profileTabs"></div>
+        <div id="tabHint" style="font-size:0.72em;color:var(--dim);margin-bottom:10px;text-align:center"></div>
+        <div class="card" id="serverList">
+            <div style="color:var(--dim);text-align:center;padding:20px;font-size:0.9em">Загрузка серверов...</div>
+        </div>
+
+        <div class="section-title">Скачать приложение</div>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+            <a href="https://apps.apple.com/app/hiddify-proxy-vpn/id6596777532" class="btn btn-sm btn-outline" style="flex:1" target="_blank">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 16.97 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/></svg>
                 iPhone
             </a>
-            <a href="https://play.google.com/store/apps/details?id=com.v2ray.ang" class="btn btn-sm btn-outline" style="flex:1" target="_blank">
+            <a href="https://play.google.com/store/apps/details?id=app.hiddify.com" class="btn btn-sm btn-outline" style="flex:1" target="_blank">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="#3ddc84"><path d="M3 20.5v-17c0-.83.52-1.28 1-1.5l10 9-10 9c-.48-.2-1-.67-1-1.5zm15-5.5l-3-2.5 3-2.5 3.5 2.5-3.5 2.5zM5 2l10 8.5-3 2.5L5 6.5V2zm0 20v-4.5l7-6.5 3 2.5L5 22z"/></svg>
                 Android
             </a>
+        </div>
+        <a href="https://github.com/hiddify/hiddify-app/releases/latest" class="btn btn-sm btn-outline" style="font-size:0.75em;padding:8px;margin-bottom:12px" target="_blank">
+            Скачать APK напрямую (если Play Market недоступен)
+        </a>
+        <div style="font-size:0.75em;color:var(--dim);line-height:1.6;padding:0 4px">
+            <strong style="color:var(--text)">Как настроить:</strong><br>
+            1. Скопируйте ссылку подписки (выше)<br>
+            2. Откройте Hiddify → нажмите «+» → «Добавить из буфера»<br>
+            3. Серверы добавятся автоматически — подключайтесь!
         </div>
 
         <!-- Speed optimization tip -->
         <div class="card" style="margin-top:16px;border-color:rgba(0,206,201,0.2);background:rgba(0,206,201,0.04)">
             <div style="font-size:0.85em;font-weight:600;color:var(--accent2);margin-bottom:8px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><path d="M13 3L4 14h7v7l9-11h-7V3z"/></svg>
-                Speed boost tip
+                Совет для ускорения
             </div>
             <p style="font-size:0.78em;color:var(--dim);line-height:1.5;margin-bottom:10px">
-                Slow connection? Replace the server address in your config with the fastest IP for your ISP.
-                Use <strong style="color:var(--text)">CloudflareSpeedTest</strong> tool to find the best IP automatically.
+                Медленное соединение? Замените адрес сервера в конфиге на самый быстрый IP для вашего провайдера.
+                Используйте <strong style="color:var(--text)">CloudflareSpeedTest</strong> для автоматического подбора.
             </p>
             <div style="display:flex;gap:8px">
                 <a href="https://github.com/XIU2/CloudflareSpeedTest/releases" class="btn btn-sm btn-outline" style="flex:1;font-size:0.75em;padding:8px" target="_blank">
-                    Download (PC)
+                    Скачать (PC)
                 </a>
                 <button class="btn btn-sm btn-outline" onclick="showCfTip()" style="flex:1;font-size:0.75em;padding:8px">
-                    How to use
+                    Инструкция
                 </button>
             </div>
         </div>
 
         <!-- Referral -->
         <div class="ref-box">
-            <h4>Share & get +5 free days</h4>
+            <h4>Поделитесь и получите +5 дней</h4>
             <div class="ref-link" id="dashRefLink"></div>
-            <button class="btn btn-sm btn-green" onclick="copyRefLink()">Copy referral link</button>
+            <button class="btn btn-sm btn-green" onclick="copyRefLink()">Копировать реферальную ссылку</button>
         </div>
 
         <!-- VIP promo (for free users) -->
         <div class="vip-promo" id="vipPromo">
-            <h4>Upgrade to VIP</h4>
-            <p>Unlimited traffic, more devices, full speed</p>
+            <h4>Перейти на VIP</h4>
+            <p>Безлимитный трафик, больше устройств, полная скорость</p>
             <button class="btn btn-sm" onclick="createPayment()" id="payBtn" style="background:rgba(243,156,18,0.15);border-color:rgba(243,156,18,0.3);color:var(--orange)">
-                Pay with Crypto
+                Оплатить криптой
             </button>
         </div>
     </div>
 
     <div class="spacer"></div>
-    <div class="footer">JetsFlare Services</div>
+    <div class="footer">JetsFlare</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -352,6 +435,10 @@
 <script>
 let currentUser = null;
 let currentLinks = [];
+let currentProfiles = [];
+let currentServers = [];
+let currentSubUrl = '';
+let activeTab = 'mobile';
 const savedCode = localStorage.getItem('jf_code');
 const urlRef = '{{ ref }}';
 
@@ -379,8 +466,8 @@ function showToast(msg) {
 }
 
 function copyText(text) {
-    navigator.clipboard.writeText(text).then(() => showToast('Copied!')).catch(() => {
-        prompt('Copy:', text);
+    navigator.clipboard.writeText(text).then(() => showToast('Скопировано!')).catch(() => {
+        prompt('Скопируйте:', text);
     });
 }
 
@@ -394,16 +481,16 @@ async function register() {
     const btn = document.getElementById('regBtn');
     const errEl = document.getElementById('regError');
     errEl.style.display = 'none';
-    btn.textContent = 'Creating...';
+    btn.textContent = 'Создаём...';
     btn.disabled = true;
 
     const nickname = document.getElementById('regNickname').value.trim();
     const referral = document.getElementById('regReferral').value.trim();
 
     if (!nickname || nickname.length < 2) {
-        errEl.textContent = 'Nickname must be at least 2 characters';
+        errEl.textContent = 'Никнейм должен быть минимум 2 символа';
         errEl.style.display = 'block';
-        btn.textContent = 'Create Account';
+        btn.textContent = 'Создать аккаунт';
         btn.disabled = false;
         return;
     }
@@ -417,24 +504,27 @@ async function register() {
         const data = await resp.json();
 
         if (!resp.ok) {
-            errEl.textContent = data.error || 'Registration failed';
+            errEl.textContent = data.error || 'Ошибка регистрации';
             errEl.style.display = 'block';
-            btn.textContent = 'Create Account';
+            btn.textContent = 'Создать аккаунт';
             btn.disabled = false;
             return;
         }
 
         currentUser = data.user;
         currentLinks = data.links;
+        currentProfiles = data.profiles || [];
+        currentServers = data.servers || [];
+        currentSubUrl = 'https://vps.jetsflare.com/go/sub/' + data.user.code;
         localStorage.setItem('jf_code', data.user.code);
         renderDashboard();
         showScreen('screenDashboard');
     } catch (e) {
-        errEl.textContent = 'Network error';
+        errEl.textContent = 'Ошибка сети';
         errEl.style.display = 'block';
     }
 
-    btn.textContent = 'Create Account';
+    btn.textContent = 'Создать аккаунт';
     btn.disabled = false;
 }
 
@@ -445,12 +535,12 @@ async function checkStatus() {
 
     const code = document.getElementById('loginCode').value.trim();
     if (!code) {
-        errEl.textContent = 'Enter your access code';
+        errEl.textContent = 'Введите код доступа';
         errEl.style.display = 'block';
         return;
     }
 
-    btn.textContent = 'Loading...';
+    btn.textContent = 'Загрузка...';
     btn.disabled = true;
 
     try {
@@ -462,9 +552,9 @@ async function checkStatus() {
         const data = await resp.json();
 
         if (!resp.ok) {
-            errEl.textContent = data.error || 'Not found';
+            errEl.textContent = data.error || 'Код не найден';
             errEl.style.display = 'block';
-            btn.textContent = 'Check Status';
+            btn.textContent = 'Войти';
             btn.disabled = false;
             localStorage.removeItem('jf_code');
             return;
@@ -472,15 +562,18 @@ async function checkStatus() {
 
         currentUser = data.user;
         currentLinks = data.links;
+        currentProfiles = data.profiles || [];
+        currentServers = data.servers || [];
+        currentSubUrl = 'https://vps.jetsflare.com/go/sub/' + data.user.code;
         localStorage.setItem('jf_code', data.user.code);
         renderDashboard();
         showScreen('screenDashboard');
     } catch (e) {
-        errEl.textContent = 'Network error';
+        errEl.textContent = 'Ошибка сети';
         errEl.style.display = 'block';
     }
 
-    btn.textContent = 'Check Status';
+    btn.textContent = 'Войти';
     btn.disabled = false;
 }
 
@@ -521,58 +614,197 @@ function renderDashboard() {
     // VIP promo — hide for VIP users
     document.getElementById('vipPromo').style.display = u.tier === 'vip' ? 'none' : 'block';
 
-    // Server list
-    renderServers();
+    // Subscription
+    const subSection = document.getElementById('subSection');
+    if (currentSubUrl) {
+        document.getElementById('subUrl').textContent = currentSubUrl;
+        subSection.style.display = 'block';
+    } else {
+        subSection.style.display = 'none';
+    }
+
+    // Server stats + profiles
+    renderServerStats();
+    renderTabBar();
+    renderProfiles();
 }
 
-function renderServers() {
+const TAB_HINTS = {
+    zapret: 'Обход блокировок РФ — YouTube, Discord, Instagram',
+    mobile: 'Через CDN — надёжный, обходит блокировки',
+    bpla: 'Максимальная скрытность — gRPC через CDN'
+};
+
+const TAB_ORDER = ['zapret', 'mobile', 'bpla'];
+
+function renderTabBar() {
+    const tabBar = document.getElementById('profileTabs');
+    const seen = {};
+    const tabs = [];
+    currentProfiles.forEach(node => {
+        (node.profiles || []).forEach(p => {
+            if (!seen[p.key]) {
+                seen[p.key] = true;
+                tabs.push({key: p.key, label: p.label});
+            }
+        });
+    });
+    tabs.sort((a, b) => TAB_ORDER.indexOf(a.key) - TAB_ORDER.indexOf(b.key));
+    if (tabs.length === 0) return;
+    if (!seen[activeTab]) activeTab = tabs[0].key;
+    tabBar.innerHTML = tabs.map(t =>
+        `<button class="tab-btn${t.key === activeTab ? ' active' : ''}" onclick="switchTab('${t.key}')">${esc(t.label)}</button>`
+    ).join('');
+}
+
+function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
+    renderProfiles();
+}
+
+function renderProfiles() {
     const container = document.getElementById('serverList');
-    if (!currentLinks || currentLinks.length === 0) {
-        container.innerHTML = '<div style="color:var(--dim);text-align:center;padding:20px;font-size:0.9em">No servers available yet</div>';
+    const hint = document.getElementById('tabHint');
+    hint.textContent = TAB_HINTS[activeTab] || '';
+
+    if (!currentProfiles || currentProfiles.length === 0) {
+        container.innerHTML = '<div style="color:var(--dim);text-align:center;padding:20px;font-size:0.9em">Серверы пока недоступны</div>';
         return;
     }
 
     let html = '';
-    currentLinks.forEach((s, i) => {
+    currentProfiles.forEach((node) => {
+        const profile = node.profiles.find(p => p.key === activeTab);
+        if (!profile) return;
+
+        const dataLink = profile.link.replace(/'/g, "\\'");
         html += `
         <div class="server-item">
             <div class="server-info">
-                <span class="server-flag">${flag(s.country_code)}</span>
+                <span class="server-flag">${flag(node.country_code)}</span>
                 <div>
-                    <div class="server-name">${esc(s.node_name || s.country_name)}</div>
-                    <div class="server-city">${esc(s.city || s.country_name)}</div>
+                    <div class="server-name">${esc(profile.label)}</div>
+                    <div class="server-city">${esc(node.city || node.country_name)}</div>
                 </div>
             </div>
             <div class="server-actions">
-                <button class="btn-icon" onclick="copyConfig(this, ${i})" title="Copy config">
+                <button class="btn-icon" onclick="copyProfileLink(this, '${dataLink}')" title="Copy config">
                     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                 </button>
-                <button class="btn-icon" onclick="showQR('${esc(s.node_name)}', ${i})" title="QR Code">
+                <button class="btn-icon" onclick="showProfileQR('${esc(profile.label)}', '${dataLink}')" title="QR Code">
                     <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M3 11V3h8v8H3zm2-6v4h4V5H5zm8-2v8h8V3h-8zm6 6h-4V5h4v4zM3 21v-8h8v8H3zm2-6v4h4v-4H5zm8 0h2v2h-2zm0 4h2v2h-2zm4-4h2v2h-2zm0 4h2v2h-2z"/></svg>
                 </button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html || '<div style="color:var(--dim);text-align:center;padding:20px;font-size:0.9em">Нет серверов для этого профиля</div>';
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function formatUptime(sec) {
+    if (!sec || sec <= 0) return '--';
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    if (d > 0) return d + 'd ' + h + 'h';
+    const m = Math.floor((sec % 3600) / 60);
+    return h + 'h ' + m + 'm';
+}
+
+function pingColor(ms) {
+    if (!ms || ms <= 0) return 'var(--dim)';
+    if (ms < 50) return 'var(--green)';
+    if (ms < 150) return 'var(--orange)';
+    return 'var(--red)';
+}
+
+function loadColor(pct) {
+    if (pct < 50) return 'var(--green)';
+    if (pct < 80) return 'var(--orange)';
+    return 'var(--red)';
+}
+
+function renderServerStats() {
+    const container = document.getElementById('serverStats');
+    if (!currentServers || currentServers.length === 0) {
+        container.innerHTML = '<div style="color:var(--dim);text-align:center;padding:12px;font-size:0.8em">Нет данных о серверах</div>';
+        return;
+    }
+
+    let html = '';
+    currentServers.forEach(s => {
+        const isOnline = s.status === 'online';
+        const ping = s.ping_ms ? Math.round(s.ping_ms) : 0;
+        const dl = s.download_mbps ? Math.round(s.download_mbps) : 0;
+        const cpu = s.cpu_percent ? Math.round(s.cpu_percent) : 0;
+        const conn = s.connections || 0;
+        const uptime = formatUptime(s.uptime_seconds);
+
+        html += `
+        <div class="stats-card">
+            <div class="stats-header">
+                <div class="stats-header-left">
+                    <span class="server-flag">${flag(s.country_code)}</span>
+                    <div>
+                        <div class="stats-name">${esc(s.node_name)}</div>
+                        <div class="stats-city">${esc(s.city || s.country_name)}</div>
+                    </div>
+                </div>
+                <span class="online-badge ${isOnline ? 'on' : 'off'}">${isOnline ? 'Онлайн' : 'Офлайн'}</span>
+            </div>
+            <div class="stats-grid">
+                <div class="mini-stat">
+                    <div class="mini-stat-val" style="color:${pingColor(ping)}">${ping > 0 ? ping + ' ms' : '--'}</div>
+                    <div class="mini-stat-label">Пинг</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="mini-stat-val">${dl > 0 ? dl + ' Мбит/с' : '--'}</div>
+                    <div class="mini-stat-label">Скорость</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="mini-stat-val">${conn}</div>
+                    <div class="mini-stat-label">Онлайн</div>
+                </div>
+            </div>
+            <div class="load-bar">
+                <div class="load-bar-fill" style="width:${cpu}%;background:${loadColor(cpu)}"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px">
+                <span style="font-size:0.6em;color:var(--dim)">CPU ${cpu}%</span>
+                <span style="font-size:0.6em;color:var(--dim)">Аптайм: ${uptime}</span>
             </div>
         </div>`;
     });
     container.innerHTML = html;
 }
 
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-function copyConfig(btn, idx) {
-    const link = currentLinks[idx].link;
+function copyProfileLink(btn, link) {
     navigator.clipboard.writeText(link).then(() => {
         btn.classList.add('copied');
-        showToast('Config copied!');
+        showToast('Конфиг скопирован!');
         setTimeout(() => btn.classList.remove('copied'), 2000);
-    }).catch(() => prompt('Copy:', link));
+    }).catch(() => prompt('Скопируйте:', link));
 }
 
-function showQR(name, idx) {
-    const link = currentLinks[idx].link;
+function showProfileQR(name, link) {
     document.getElementById('qrTitle').textContent = name;
     const container = document.getElementById('qrCanvas');
     container.innerHTML = '';
     new QRCode(container, { text: link, width: 260, height: 260, colorDark: '#e0e0e8', colorLight: '#0d0d14', correctLevel: QRCode.CorrectLevel.M });
+    document.getElementById('qrModal').classList.add('active');
+}
+
+function copySubUrl() {
+    copyText(currentSubUrl);
+}
+
+function showSubQR() {
+    document.getElementById('qrTitle').textContent = 'Subscription';
+    const container = document.getElementById('qrCanvas');
+    container.innerHTML = '';
+    new QRCode(container, { text: currentSubUrl, width: 260, height: 260, colorDark: '#e0e0e8', colorLight: '#0d0d14', correctLevel: QRCode.CorrectLevel.M });
     document.getElementById('qrModal').classList.add('active');
 }
 
@@ -592,16 +824,16 @@ function showCfTip() {
     document.getElementById('qrTitle').textContent = 'CloudflareSpeedTest';
     document.getElementById('qrCanvas').innerHTML = `
         <div style="text-align:left;font-size:0.82em;color:var(--dim);line-height:1.7">
-            <p style="margin-bottom:10px;color:var(--text)">Find the fastest Cloudflare IP for your ISP:</p>
+            <p style="margin-bottom:10px;color:var(--text)">Найти самый быстрый IP Cloudflare для вашего провайдера:</p>
             <ol style="padding-left:18px">
-                <li>Download <strong>CloudflareSpeedTest</strong> from GitHub</li>
-                <li>Run: <code style="background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;font-size:0.9em">CloudflareST.exe -tl 200 -sl 5 -dn 10</code></li>
-                <li>Copy the first IP from the results</li>
-                <li>In your VPN app, edit the server config</li>
-                <li>Replace the server address with the fastest IP</li>
-                <li>Set <strong>SNI</strong> and <strong>Host</strong> to the original domain</li>
+                <li>Скачайте <strong>CloudflareSpeedTest</strong> с GitHub</li>
+                <li>Запустите: <code style="background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;font-size:0.9em">CloudflareST.exe -tl 200 -sl 5 -dn 10</code></li>
+                <li>Скопируйте первый IP из результатов</li>
+                <li>В Hiddify откройте настройки сервера</li>
+                <li>Замените адрес сервера на найденный IP</li>
+                <li>Убедитесь что <strong>SNI</strong> и <strong>Host</strong> остались прежними</li>
             </ol>
-            <p style="margin-top:12px;font-size:0.85em;color:var(--accent2)">This can improve speed 3-5x in some regions!</p>
+            <p style="margin-top:12px;font-size:0.85em;color:var(--accent2)">Может ускорить соединение в 3-5 раз!</p>
         </div>
     `;
     document.getElementById('qrModal').classList.add('active');
@@ -610,7 +842,7 @@ function showCfTip() {
 async function createPayment() {
     if (!currentUser) return;
     const btn = document.getElementById('payBtn');
-    btn.textContent = 'Creating invoice...';
+    btn.textContent = 'Создаём счёт...';
     btn.disabled = true;
 
     try {
@@ -623,15 +855,15 @@ async function createPayment() {
 
         if (data.pay_url) {
             window.open(data.pay_url, '_blank');
-            showToast('Payment page opened');
+            showToast('Страница оплаты открыта');
         } else {
-            showToast(data.error || 'Payment not available');
+            showToast(data.error || 'Оплата недоступна');
         }
     } catch (e) {
-        showToast('Payment error');
+        showToast('Ошибка оплаты');
     }
 
-    btn.textContent = 'Pay with Crypto';
+    btn.textContent = 'Оплатить криптой';
     btn.disabled = false;
 }
 </script>

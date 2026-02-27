@@ -26,6 +26,11 @@ if [[ -z "$CLIENTS" || "$CLIENTS" == "null" ]]; then
     exit 0
 fi
 
+# Safety: don't wipe existing clients when panel returns empty list
+if [[ "$CLIENTS" == "[]" ]]; then
+    exit 0
+fi
+
 # Use python3 to merge clients into Xray config
 python3 - "$CLIENTS" "$XRAY_CONFIG" << 'PYEOF'
 import json, sys
@@ -38,7 +43,7 @@ try:
 except (json.JSONDecodeError, ValueError):
     sys.exit(0)
 
-if not isinstance(new_clients, list):
+if not isinstance(new_clients, list) or len(new_clients) == 0:
     sys.exit(0)
 
 try:
@@ -47,7 +52,7 @@ try:
 except (IOError, json.JSONDecodeError):
     sys.exit(0)
 
-# Find the VLESS inbound (not the API inbound)
+# Update ALL VLESS inbounds (not just the first one)
 changed = False
 for inbound in config.get("inbounds", []):
     if inbound.get("protocol") == "vless" and inbound.get("tag") != "api-in":
@@ -70,7 +75,6 @@ for inbound in config.get("inbounds", []):
         if current_ids != new_ids:
             inbound["settings"]["clients"] = new_list
             changed = True
-        break
 
 if changed:
     with open(config_path, "w") as f:
